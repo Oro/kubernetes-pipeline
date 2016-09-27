@@ -145,6 +145,28 @@ terraform destroy -force 1-initial
 Destroy complete! Resources: 1 destroyed.[0m
 #+end_example
 
+** Alright, let's get to work
+The target architecture looks roughly as follows
+#+BEGIN_SRC dot :file arch.png
+digraph vpc{
+        rankdir="BT";
+        {rank=same; ELB EIP }
+
+        EC2 [color="blue"];
+        EC2->ELB [dir="back",arrowtail="normal"];
+        ELB->VPC;
+        Bastion->VPC;
+        Bastion->EC2;
+        EIP->Bastion;
+        EC2->ASG [dir="forward",arrowhead="none",arrowtail="normal",taillabel="2.."];
+        ASG->VPC;
+}
+#+END_SRC
+
+#+RESULTS[34dd8e31093ce2945b29b350e86652d00c747af7]:
+[[file:arch.png]]
+
+Note that the EC2 instances are not going to be created via terraform, but rather via the auto scaling group's launch configuration (not pictured).
 * Footnotes
 
 [fn:1] Note that the output might look weird. I could not get emacs to work well with the escape characters terraform uses to e.g. make its text bold.
