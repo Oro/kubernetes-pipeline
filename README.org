@@ -2,7 +2,7 @@
   :PROPERTIES:
   :header-args: :results output verbatim  :cache yes :exports both
   :END:
-** TODO Prerequisites
+** Prerequisites
 This guide assumes you are using OSX. You also need to be familiar with both [[http://brew.sh/index.html][homebrew]] and AWS.
 First, I've made sure terraform is up to date
 #+BEGIN_SRC sh  
@@ -13,7 +13,7 @@ brew install terraform
 #+RESULTS[fe6c2689e91e6d061c66b63dbc04577128b5eefd]:
 : Already up-to-date.
 
-Now let's make sure our ) are picked up by terraform.
+** Initial check to make sure terraform works
 To make sure my AWS credentials (saved in $HOME/.aws/credentials) were picked up by terraform, I've created an initial, bare-bones terraform config (which is pretty much taken verbatim from the [[https://www.terraform.io/intro/getting-started/build.html][Terraform Getting Started Guide]])
 #+BEGIN_SRC terraform :tangle 1-initial/init.tf
 provider "aws" {}
