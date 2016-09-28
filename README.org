@@ -156,16 +156,996 @@ Now that I have a basic understanding of Terraform, let's get to using it. As in
 #+BEGIN_SRC sh
 export GOPATH=$HOME/golang/
 mkdir -p $GOPATH
-go get -u -d k8s.io/kops
+go get -d k8s.io/kops
 #+END_SRC
-This timed out for me, several times. Running =go get= with =-u= allows you to rerun the same query again, hopefully without timing out.
+
+#+RESULTS[b684f174f19196c3a2fc72abc258007591567ce1]:
+
+This timed out for me, several times. Running =go get= with =-u= allowed me to rerun the same query again and again. This happened during the time my ISP was having some troubles, so your mileage will vary.
 
 Afterwards, I built the binary
-#+BEGIN_SRC sh
-cd ${GOPATH}/src/k8s.io/kops/
+#+BEGIN_SRC sh :dir ~/golang/src/k8s.io/kops/
 make
 #+END_SRC
+Also, I made sure to already have a hosted zone setup via the AWS console (mine was already setup since I've used Route53 as my domain registrar).
 
+After the compilation was done, I've instructed Kops to output Terraform files for the cluster via
+#+BEGIN_SRC sh 
+~/golang/bin/kops create cluster --zones=us-east-1a dev.k8s.orovecchia.com --state=s3://oro-kops-state
+~/golang/bin/kops update cluster --target=terraform dev.k8s.orovecchia.com --state=s3://oro-kops-state
+#+END_SRC
+
+#+RESULTS[a2375c6c1169489fd0fbc275d3351ae5ff50fd4d]:
+: Wrote config for dev.k8s.orovecchia.com to "/Users/Marco/.kube/config"
+
+This will create the terraform files in =out/terraform=, setup the Kubernetes config in =~/.kube/config= and store the [[https://github.com/kubernetes/kops/blob/master/docs/state.md][state]] of Kops inside an S3 bucket. This has the benefit that 
+a) other team members (potentially) can modify the cluster and
+b) the infrastructure itself can be safely stored within a repository
+
+Let's spawn the cluster
+#+BEGIN_SRC sh :dir out/terraform
+terraform plan
+#+END_SRC
+
+#+RESULTS[95274117a75246d4cc3b51646e38271328ecc460]:
+#+begin_example
+Refreshing Terraform state in-memory prior to plan...
+The refreshed state will be used to calculate this plan, but
+will not be persisted to local or remote state storage.
+
+
+The Terraform execution plan has been generated and is shown below.
+Resources are shown in alphabetical order for quick scanning. Green resources
+will be created (or destroyed and then created if an existing resource
+exists), yellow resources are being changed in-place, and red resources
+will be destroyed. Cyan entries are data sources to be read.
+
+Note: You didn't specify an "-out" parameter to save this plan, so when
+"apply" is called, Terraform can't guarantee this is what will execute.
+
+[32m+ aws_autoscaling_group.master-us-east-1a-masters-dev-k8s-orovecchia-com
+[0m    arn:                                "<computed>"
+    availability_zones.#:               "<computed>"
+    default_cooldown:                   "<computed>"
+    desired_capacity:                   "<computed>"
+    force_delete:                       "false"
+    health_check_grace_period:          "300"
+    health_check_type:                  "<computed>"
+    launch_configuration:               "${aws_launch_configuration.master-us-east-1a-masters-dev-k8s-orovecchia-com.id}"
+    max_size:                           "1"
+    metrics_granularity:                "1Minute"
+    min_size:                           "1"
+    name:                               "master-us-east-1a.masters.dev.k8s.orovecchia.com"
+    protect_from_scale_in:              "false"
+    tag.#:                              "5"
+    tag.1033606357.key:                 "k8s.io/dns/internal"
+    tag.1033606357.propagate_at_launch: "true"
+    tag.1033606357.value:               "api.internal.dev.k8s.orovecchia.com"
+    tag.1601041186.key:                 "k8s.io/role/master"
+    tag.1601041186.propagate_at_launch: "true"
+    tag.1601041186.value:               "1"
+    tag.2531097064.key:                 "k8s.io/dns/public"
+    tag.2531097064.propagate_at_launch: "true"
+    tag.2531097064.value:               "api.dev.k8s.orovecchia.com"
+    tag.453089870.key:                  "Name"
+    tag.453089870.propagate_at_launch:  "true"
+    tag.453089870.value:                "master-us-east-1a.masters.dev.k8s.orovecchia.com"
+    tag.48875632.key:                   "KubernetesCluster"
+    tag.48875632.propagate_at_launch:   "true"
+    tag.48875632.value:                 "dev.k8s.orovecchia.com"
+    vpc_zone_identifier.#:              "<computed>"
+    wait_for_capacity_timeout:          "10m"
+[0m
+[0m[32m+ aws_autoscaling_group.nodes-dev-k8s-orovecchia-com
+[0m    arn:                                "<computed>"
+    availability_zones.#:               "<computed>"
+    default_cooldown:                   "<computed>"
+    desired_capacity:                   "<computed>"
+    force_delete:                       "false"
+    health_check_grace_period:          "300"
+    health_check_type:                  "<computed>"
+    launch_configuration:               "${aws_launch_configuration.nodes-dev-k8s-orovecchia-com.id}"
+    max_size:                           "2"
+    metrics_granularity:                "1Minute"
+    min_size:                           "2"
+    name:                               "nodes.dev.k8s.orovecchia.com"
+    protect_from_scale_in:              "false"
+    tag.#:                              "3"
+    tag.125196166.key:                  "Name"
+    tag.125196166.propagate_at_launch:  "true"
+    tag.125196166.value:                "nodes.dev.k8s.orovecchia.com"
+    tag.1967977115.key:                 "k8s.io/role/node"
+    tag.1967977115.propagate_at_launch: "true"
+    tag.1967977115.value:               "1"
+    tag.48875632.key:                   "KubernetesCluster"
+    tag.48875632.propagate_at_launch:   "true"
+    tag.48875632.value:                 "dev.k8s.orovecchia.com"
+    vpc_zone_identifier.#:              "<computed>"
+    wait_for_capacity_timeout:          "10m"
+[0m
+[0m[32m+ aws_ebs_volume.us-east-1a-etcd-events-dev-k8s-orovecchia-com
+[0m    availability_zone:       "us-east-1a"
+    encrypted:               "false"
+    iops:                    "<computed>"
+    kms_key_id:              "<computed>"
+    size:                    "20"
+    snapshot_id:             "<computed>"
+    tags.%:                  "4"
+    tags.KubernetesCluster:  "dev.k8s.orovecchia.com"
+    tags.Name:               "us-east-1a.etcd-events.dev.k8s.orovecchia.com"
+    tags.k8s.io/etcd/events: "us-east-1a/us-east-1a"
+    tags.k8s.io/role/master: "1"
+    type:                    "gp2"
+[0m
+[0m[32m+ aws_ebs_volume.us-east-1a-etcd-main-dev-k8s-orovecchia-com
+[0m    availability_zone:       "us-east-1a"
+    encrypted:               "false"
+    iops:                    "<computed>"
+    kms_key_id:              "<computed>"
+    size:                    "20"
+    snapshot_id:             "<computed>"
+    tags.%:                  "4"
+    tags.KubernetesCluster:  "dev.k8s.orovecchia.com"
+    tags.Name:               "us-east-1a.etcd-main.dev.k8s.orovecchia.com"
+    tags.k8s.io/etcd/main:   "us-east-1a/us-east-1a"
+    tags.k8s.io/role/master: "1"
+    type:                    "gp2"
+[0m
+[0m[32m+ aws_iam_instance_profile.masters-dev-k8s-orovecchia-com
+[0m    arn:             "<computed>"
+    create_date:     "<computed>"
+    name:            "masters.dev.k8s.orovecchia.com"
+    path:            "/"
+    roles.#:         "1"
+    roles.241661314: "masters.dev.k8s.orovecchia.com"
+    unique_id:       "<computed>"
+[0m
+[0m[32m+ aws_iam_instance_profile.nodes-dev-k8s-orovecchia-com
+[0m    arn:             "<computed>"
+    create_date:     "<computed>"
+    name:            "nodes.dev.k8s.orovecchia.com"
+    path:            "/"
+    roles.#:         "1"
+    roles.241378590: "nodes.dev.k8s.orovecchia.com"
+    unique_id:       "<computed>"
+[0m
+[0m[32m+ aws_iam_role.masters-dev-k8s-orovecchia-com
+[0m    arn:                "<computed>"
+    assume_role_policy: "{\n  \"Version\": \"2012-10-17\",\n  \"Statement\": [\n    {\n      \"Effect\": \"Allow\",\n      \"Principal\": { \"Service\": \"ec2.amazonaws.com\"},\n      \"Action\": \"sts:AssumeRole\"\n    }\n  ]\n}\n"
+    name:               "masters.dev.k8s.orovecchia.com"
+    path:               "/"
+    unique_id:          "<computed>"
+[0m
+[0m[32m+ aws_iam_role.nodes-dev-k8s-orovecchia-com
+[0m    arn:                "<computed>"
+    assume_role_policy: "{\n  \"Version\": \"2012-10-17\",\n  \"Statement\": [\n    {\n      \"Effect\": \"Allow\",\n      \"Principal\": { \"Service\": \"ec2.amazonaws.com\"},\n      \"Action\": \"sts:AssumeRole\"\n    }\n  ]\n}\n"
+    name:               "nodes.dev.k8s.orovecchia.com"
+    path:               "/"
+    unique_id:          "<computed>"
+[0m
+[0m[32m+ aws_iam_role_policy.masters-dev-k8s-orovecchia-com
+[0m    name:   "masters.dev.k8s.orovecchia.com"
+    policy: "{\n  \"Version\": \"2012-10-17\",\n  \"Statement\": [\n    {\n      \"Effect\": \"Allow\",\n      \"Action\": [\n        \"ecr:GetAuthorizationToken\",\n        \"ecr:BatchCheckLayerAvailability\",\n        \"ecr:GetDownloadUrlForLayer\",\n        \"ecr:GetRepositoryPolicy\",\n        \"ecr:DescribeRepositories\",\n        \"ecr:ListImages\",\n        \"ecr:BatchGetImage\"\n      ],\n      \"Resource\": [\n        \"*\"\n      ]\n    },\n    {\n      \"Effect\": \"Allow\",\n      \"Action\": [\n        \"ec2:*\"\n      ],\n      \"Resource\": [\n        \"*\"\n      ]\n    },\n    {\n      \"Effect\": \"Allow\",\n      \"Action\": [\n        \"route53:*\"\n      ],\n      \"Resource\": [\n        \"*\"\n      ]\n    },\n    {\n      \"Effect\": \"Allow\",\n      \"Action\": [\n        \"elasticloadbalancing:*\"\n      ],\n      \"Resource\": [\n        \"*\"\n      ]\n    },\n    {\n      \"Effect\": \"Allow\",\n      \"Action\": [\n        \"s3:*\"\n      ],\n      \"Resource\": [\n        \"arn:aws:s3:::oro-kops-state/dev.k8s.orovecchia.com\",\n        \"arn:aws:s3:::oro-kops-state/dev.k8s.orovecchia.com/*\"\n      ]\n    },\n    {\n      \"Effect\": \"Allow\",\n      \"Action\": [\n        \"s3:GetBucketLocation\",\n        \"s3:ListBucket\"\n      ],\n      \"Resource\": [\n        \"arn:aws:s3:::oro-kops-state\"\n      ]\n    }\n  ]\n}"
+    role:   "masters.dev.k8s.orovecchia.com"
+[0m
+[0m[32m+ aws_iam_role_policy.nodes-dev-k8s-orovecchia-com
+[0m    name:   "nodes.dev.k8s.orovecchia.com"
+    policy: "{\n  \"Version\": \"2012-10-17\",\n  \"Statement\": [\n    {\n      \"Effect\": \"Allow\",\n      \"Action\": [\n        \"ec2:Describe*\"\n      ],\n      \"Resource\": [\n        \"*\"\n      ]\n    },\n    {\n      \"Effect\": \"Allow\",\n      \"Action\": [\n        \"route53:*\"\n      ],\n      \"Resource\": [\n        \"*\"\n      ]\n    },\n    {\n      \"Effect\": \"Allow\",\n      \"Action\": [\n        \"ecr:GetAuthorizationToken\",\n        \"ecr:BatchCheckLayerAvailability\",\n        \"ecr:GetDownloadUrlForLayer\",\n        \"ecr:GetRepositoryPolicy\",\n        \"ecr:DescribeRepositories\",\n        \"ecr:ListImages\",\n        \"ecr:BatchGetImage\"\n      ],\n      \"Resource\": [\n        \"*\"\n      ]\n    },\n    {\n      \"Effect\": \"Allow\",\n      \"Action\": [\n        \"s3:*\"\n      ],\n      \"Resource\": [\n        \"arn:aws:s3:::oro-kops-state/dev.k8s.orovecchia.com\",\n        \"arn:aws:s3:::oro-kops-state/dev.k8s.orovecchia.com/*\"\n      ]\n    },\n    {\n      \"Effect\": \"Allow\",\n      \"Action\": [\n        \"s3:GetBucketLocation\",\n        \"s3:ListBucket\"\n      ],\n      \"Resource\": [\n        \"arn:aws:s3:::oro-kops-state\"\n      ]\n    }\n  ]\n}"
+    role:   "nodes.dev.k8s.orovecchia.com"
+[0m
+[0m[32m+ aws_internet_gateway.dev-k8s-orovecchia-com
+[0m    tags.%:                 "2"
+    tags.KubernetesCluster: "dev.k8s.orovecchia.com"
+    tags.Name:              "dev.k8s.orovecchia.com"
+    vpc_id:                 "${aws_vpc.dev-k8s-orovecchia-com.id}"
+[0m
+[0m[32m+ aws_key_pair.kubernetes-dev-k8s-orovecchia-com-952344bf29bc219a86d3bc12f1767073
+[0m    fingerprint: "<computed>"
+    key_name:    "kubernetes.dev.k8s.orovecchia.com-95:23:44:bf:29:bc:21:9a:86:d3:bc:12:f1:76:70:73"
+    public_key:  "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC7HZmYWG4yWSRCN2bd25Ex0vDE2406sQH6b3QAaQUsx9l4sMnMG6iL0FXCwKqeizthua1sxri+ZAqrWlVhv5vGG7gYs5ua7gAdV3I9auuUiKUb+viDXq8CfERWevqDypYTUl/5y4ujFRGnWQR0hbaL6L/q9CdtnMjduESE7Lwjr91nkYnSGOgLde5tEEKbrHItFEg8yhYOGYmJUthsIcm075/0L/v6w/mDActGg+8GTDJDUyjHgaEtrob09/AJQ+gEpj6/98ZhtPUsB4KKwyONAZb4cUj6HljdYl2DNwsvpibkH7/pBIE82LPkt9t+PfFbKthj8EI/pKhPO28AkFEN orm@automic.com"
+[0m
+[0m[32m+ aws_launch_configuration.master-us-east-1a-masters-dev-k8s-orovecchia-com
+[0m    associate_public_ip_address:                    "true"
+    ebs_block_device.#:                             "<computed>"
+    ebs_optimized:                                  "<computed>"
+    enable_monitoring:                              "true"
+    ephemeral_block_device.#:                       "1"
+    ephemeral_block_device.3292514005.device_name:  "/dev/sdc"
+    ephemeral_block_device.3292514005.virtual_name: "ephemeral0"
+    iam_instance_profile:                           "${aws_iam_instance_profile.masters-dev-k8s-orovecchia-com.id}"
+    image_id:                                       "ami-08ee2f65"
+    instance_type:                                  "m3.large"
+    key_name:                                       "${aws_key_pair.kubernetes-dev-k8s-orovecchia-com-952344bf29bc219a86d3bc12f1767073.id}"
+    name:                                           "<computed>"
+    name_prefix:                                    "master-us-east-1a.masters.dev.k8s.orovecchia.com-"
+    root_block_device.#:                            "1"
+    root_block_device.0.delete_on_termination:      "true"
+    root_block_device.0.iops:                       "<computed>"
+    root_block_device.0.volume_size:                "20"
+    root_block_device.0.volume_type:                "gp2"
+    security_groups.#:                              "<computed>"
+    user_data:                                      "e2e7c9f61a9d6ff7aba8961fb9539217b262dfd2"
+[0m
+[0m[32m+ aws_launch_configuration.nodes-dev-k8s-orovecchia-com
+[0m    associate_public_ip_address:               "true"
+    ebs_block_device.#:                        "<computed>"
+    ebs_optimized:                             "<computed>"
+    enable_monitoring:                         "true"
+    iam_instance_profile:                      "${aws_iam_instance_profile.nodes-dev-k8s-orovecchia-com.id}"
+    image_id:                                  "ami-08ee2f65"
+    instance_type:                             "t2.medium"
+    key_name:                                  "${aws_key_pair.kubernetes-dev-k8s-orovecchia-com-952344bf29bc219a86d3bc12f1767073.id}"
+    name:                                      "<computed>"
+    name_prefix:                               "nodes.dev.k8s.orovecchia.com-"
+    root_block_device.#:                       "1"
+    root_block_device.0.delete_on_termination: "true"
+    root_block_device.0.iops:                  "<computed>"
+    root_block_device.0.volume_size:           "20"
+    root_block_device.0.volume_type:           "gp2"
+    security_groups.#:                         "<computed>"
+    user_data:                                 "2922481b3a0debb2260e4be5b59ae24d31416939"
+[0m
+[0m[32m+ aws_route.0-0-0-0--0
+[0m    destination_cidr_block:     "0.0.0.0/0"
+    destination_prefix_list_id: "<computed>"
+    gateway_id:                 "${aws_internet_gateway.dev-k8s-orovecchia-com.id}"
+    instance_id:                "<computed>"
+    instance_owner_id:          "<computed>"
+    nat_gateway_id:             "<computed>"
+    network_interface_id:       "<computed>"
+    origin:                     "<computed>"
+    route_table_id:             "${aws_route_table.dev-k8s-orovecchia-com.id}"
+    state:                      "<computed>"
+[0m
+[0m[32m+ aws_route_table.dev-k8s-orovecchia-com
+[0m    route.#:                "<computed>"
+    tags.%:                 "2"
+    tags.KubernetesCluster: "dev.k8s.orovecchia.com"
+    tags.Name:              "dev.k8s.orovecchia.com"
+    vpc_id:                 "${aws_vpc.dev-k8s-orovecchia-com.id}"
+[0m
+[0m[32m+ aws_route_table_association.us-east-1a-dev-k8s-orovecchia-com
+[0m    route_table_id: "${aws_route_table.dev-k8s-orovecchia-com.id}"
+    subnet_id:      "${aws_subnet.us-east-1a-dev-k8s-orovecchia-com.id}"
+[0m
+[0m[32m+ aws_security_group.masters-dev-k8s-orovecchia-com
+[0m    description:            "Security group for masters"
+    egress.#:               "<computed>"
+    ingress.#:              "<computed>"
+    name:                   "masters.dev.k8s.orovecchia.com"
+    owner_id:               "<computed>"
+    tags.%:                 "2"
+    tags.KubernetesCluster: "dev.k8s.orovecchia.com"
+    tags.Name:              "masters.dev.k8s.orovecchia.com"
+    vpc_id:                 "${aws_vpc.dev-k8s-orovecchia-com.id}"
+[0m
+[0m[32m+ aws_security_group.nodes-dev-k8s-orovecchia-com
+[0m    description:            "Security group for nodes"
+    egress.#:               "<computed>"
+    ingress.#:              "<computed>"
+    name:                   "nodes.dev.k8s.orovecchia.com"
+    owner_id:               "<computed>"
+    tags.%:                 "2"
+    tags.KubernetesCluster: "dev.k8s.orovecchia.com"
+    tags.Name:              "nodes.dev.k8s.orovecchia.com"
+    vpc_id:                 "${aws_vpc.dev-k8s-orovecchia-com.id}"
+[0m
+[0m[32m+ aws_security_group_rule.all-master-to-master
+[0m    from_port:                "0"
+    protocol:                 "-1"
+    security_group_id:        "${aws_security_group.masters-dev-k8s-orovecchia-com.id}"
+    self:                     "false"
+    source_security_group_id: "${aws_security_group.masters-dev-k8s-orovecchia-com.id}"
+    to_port:                  "0"
+    type:                     "ingress"
+[0m
+[0m[32m+ aws_security_group_rule.all-master-to-node
+[0m    from_port:                "0"
+    protocol:                 "-1"
+    security_group_id:        "${aws_security_group.nodes-dev-k8s-orovecchia-com.id}"
+    self:                     "false"
+    source_security_group_id: "${aws_security_group.masters-dev-k8s-orovecchia-com.id}"
+    to_port:                  "0"
+    type:                     "ingress"
+[0m
+[0m[32m+ aws_security_group_rule.all-node-to-master
+[0m    from_port:                "0"
+    protocol:                 "-1"
+    security_group_id:        "${aws_security_group.masters-dev-k8s-orovecchia-com.id}"
+    self:                     "false"
+    source_security_group_id: "${aws_security_group.nodes-dev-k8s-orovecchia-com.id}"
+    to_port:                  "0"
+    type:                     "ingress"
+[0m
+[0m[32m+ aws_security_group_rule.all-node-to-node
+[0m    from_port:                "0"
+    protocol:                 "-1"
+    security_group_id:        "${aws_security_group.nodes-dev-k8s-orovecchia-com.id}"
+    self:                     "false"
+    source_security_group_id: "${aws_security_group.nodes-dev-k8s-orovecchia-com.id}"
+    to_port:                  "0"
+    type:                     "ingress"
+[0m
+[0m[32m+ aws_security_group_rule.https-external-to-master
+[0m    cidr_blocks.#:            "1"
+    cidr_blocks.0:            "0.0.0.0/0"
+    from_port:                "443"
+    protocol:                 "tcp"
+    security_group_id:        "${aws_security_group.masters-dev-k8s-orovecchia-com.id}"
+    self:                     "false"
+    source_security_group_id: "<computed>"
+    to_port:                  "443"
+    type:                     "ingress"
+[0m
+[0m[32m+ aws_security_group_rule.master-egress
+[0m    cidr_blocks.#:            "1"
+    cidr_blocks.0:            "0.0.0.0/0"
+    from_port:                "0"
+    protocol:                 "-1"
+    security_group_id:        "${aws_security_group.masters-dev-k8s-orovecchia-com.id}"
+    self:                     "false"
+    source_security_group_id: "<computed>"
+    to_port:                  "0"
+    type:                     "egress"
+[0m
+[0m[32m+ aws_security_group_rule.node-egress
+[0m    cidr_blocks.#:            "1"
+    cidr_blocks.0:            "0.0.0.0/0"
+    from_port:                "0"
+    protocol:                 "-1"
+    security_group_id:        "${aws_security_group.nodes-dev-k8s-orovecchia-com.id}"
+    self:                     "false"
+    source_security_group_id: "<computed>"
+    to_port:                  "0"
+    type:                     "egress"
+[0m
+[0m[32m+ aws_security_group_rule.ssh-external-to-master
+[0m    cidr_blocks.#:            "1"
+    cidr_blocks.0:            "0.0.0.0/0"
+    from_port:                "22"
+    protocol:                 "tcp"
+    security_group_id:        "${aws_security_group.masters-dev-k8s-orovecchia-com.id}"
+    self:                     "false"
+    source_security_group_id: "<computed>"
+    to_port:                  "22"
+    type:                     "ingress"
+[0m
+[0m[32m+ aws_security_group_rule.ssh-external-to-node
+[0m    cidr_blocks.#:            "1"
+    cidr_blocks.0:            "0.0.0.0/0"
+    from_port:                "22"
+    protocol:                 "tcp"
+    security_group_id:        "${aws_security_group.nodes-dev-k8s-orovecchia-com.id}"
+    self:                     "false"
+    source_security_group_id: "<computed>"
+    to_port:                  "22"
+    type:                     "ingress"
+[0m
+[0m[32m+ aws_subnet.us-east-1a-dev-k8s-orovecchia-com
+[0m    availability_zone:       "us-east-1a"
+    cidr_block:              "172.20.32.0/19"
+    map_public_ip_on_launch: "false"
+    tags.%:                  "2"
+    tags.KubernetesCluster:  "dev.k8s.orovecchia.com"
+    tags.Name:               "us-east-1a.dev.k8s.orovecchia.com"
+    vpc_id:                  "${aws_vpc.dev-k8s-orovecchia-com.id}"
+[0m
+[0m[32m+ aws_vpc.dev-k8s-orovecchia-com
+[0m    cidr_block:                "172.20.0.0/16"
+    default_network_acl_id:    "<computed>"
+    default_route_table_id:    "<computed>"
+    default_security_group_id: "<computed>"
+    dhcp_options_id:           "<computed>"
+    enable_classiclink:        "<computed>"
+    enable_dns_hostnames:      "true"
+    enable_dns_support:        "true"
+    instance_tenancy:          "<computed>"
+    main_route_table_id:       "<computed>"
+    tags.%:                    "2"
+    tags.KubernetesCluster:    "dev.k8s.orovecchia.com"
+    tags.Name:                 "dev.k8s.orovecchia.com"
+[0m
+[0m[32m+ aws_vpc_dhcp_options.dev-k8s-orovecchia-com
+[0m    domain_name:            "ec2.internal"
+    domain_name_servers.#:  "1"
+    domain_name_servers.0:  "AmazonProvidedDNS"
+    tags.%:                 "2"
+    tags.KubernetesCluster: "dev.k8s.orovecchia.com"
+    tags.Name:              "dev.k8s.orovecchia.com"
+[0m
+[0m[32m+ aws_vpc_dhcp_options_association.dev-k8s-orovecchia-com
+[0m    dhcp_options_id: "${aws_vpc_dhcp_options.dev-k8s-orovecchia-com.id}"
+    vpc_id:          "${aws_vpc.dev-k8s-orovecchia-com.id}"
+[0m
+[0m
+[0m[1mPlan:[0m 32 to add, 0 to change, 0 to destroy.[0m
+#+end_example
+
+#+BEGIN_SRC sh :dir out/terraform
+terraform apply
+#+END_SRC
+
+#+RESULTS[acb99038c2f150de063a574dc7a81de135882ffa]:
+#+begin_example
+[0m[1maws_key_pair.kubernetes-dev-k8s-orovecchia-com-952344bf29bc219a86d3bc12f1767073: Creating...[21m
+  fingerprint: "" => "<computed>"
+  key_name:    "" => "kubernetes.dev.k8s.orovecchia.com-95:23:44:bf:29:bc:21:9a:86:d3:bc:12:f1:76:70:73"
+  public_key:  "" => "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC7HZmYWG4yWSRCN2bd25Ex0vDE2406sQH6b3QAaQUsx9l4sMnMG6iL0FXCwKqeizthua1sxri+ZAqrWlVhv5vGG7gYs5ua7gAdV3I9auuUiKUb+viDXq8CfERWevqDypYTUl/5y4ujFRGnWQR0hbaL6L/q9CdtnMjduESE7Lwjr91nkYnSGOgLde5tEEKbrHItFEg8yhYOGYmJUthsIcm075/0L/v6w/mDActGg+8GTDJDUyjHgaEtrob09/AJQ+gEpj6/98ZhtPUsB4KKwyONAZb4cUj6HljdYl2DNwsvpibkH7/pBIE82LPkt9t+PfFbKthj8EI/pKhPO28AkFEN orm@automic.com"[0m
+[0m[1maws_iam_role.masters-dev-k8s-orovecchia-com: Creating...[21m
+  arn:                "" => "<computed>"
+  assume_role_policy: "" => "{\n  \"Version\": \"2012-10-17\",\n  \"Statement\": [\n    {\n      \"Effect\": \"Allow\",\n      \"Principal\": { \"Service\": \"ec2.amazonaws.com\"},\n      \"Action\": \"sts:AssumeRole\"\n    }\n  ]\n}\n"
+  name:               "" => "masters.dev.k8s.orovecchia.com"
+  path:               "" => "/"
+  unique_id:          "" => "<computed>"[0m
+[0m[1maws_vpc_dhcp_options.dev-k8s-orovecchia-com: Creating...[21m
+  domain_name:            "" => "ec2.internal"
+  domain_name_servers.#:  "" => "1"
+  domain_name_servers.0:  "" => "AmazonProvidedDNS"
+  tags.%:                 "" => "2"
+  tags.KubernetesCluster: "" => "dev.k8s.orovecchia.com"
+  tags.Name:              "" => "dev.k8s.orovecchia.com"[0m
+[0m[1maws_iam_role.nodes-dev-k8s-orovecchia-com: Creating...[21m
+  arn:                "" => "<computed>"
+  assume_role_policy: "" => "{\n  \"Version\": \"2012-10-17\",\n  \"Statement\": [\n    {\n      \"Effect\": \"Allow\",\n      \"Principal\": { \"Service\": \"ec2.amazonaws.com\"},\n      \"Action\": \"sts:AssumeRole\"\n    }\n  ]\n}\n"
+  name:               "" => "nodes.dev.k8s.orovecchia.com"
+  path:               "" => "/"
+  unique_id:          "" => "<computed>"[0m
+[0m[1maws_vpc.dev-k8s-orovecchia-com: Creating...[21m
+  cidr_block:                "" => "172.20.0.0/16"
+  default_network_acl_id:    "" => "<computed>"
+  default_route_table_id:    "" => "<computed>"
+  default_security_group_id: "" => "<computed>"
+  dhcp_options_id:           "" => "<computed>"
+  enable_classiclink:        "" => "<computed>"
+  enable_dns_hostnames:      "" => "true"
+  enable_dns_support:        "" => "true"
+  instance_tenancy:          "" => "<computed>"
+  main_route_table_id:       "" => "<computed>"
+  tags.%:                    "" => "2"
+  tags.KubernetesCluster:    "" => "dev.k8s.orovecchia.com"
+  tags.Name:                 "" => "dev.k8s.orovecchia.com"[0m
+[0m[1maws_ebs_volume.us-east-1a-etcd-events-dev-k8s-orovecchia-com: Creating...[21m
+  availability_zone:       "" => "us-east-1a"
+  encrypted:               "" => "false"
+  iops:                    "" => "<computed>"
+  kms_key_id:              "" => "<computed>"
+  size:                    "" => "20"
+  snapshot_id:             "" => "<computed>"
+  tags.%:                  "" => "4"
+  tags.KubernetesCluster:  "" => "dev.k8s.orovecchia.com"
+  tags.Name:               "" => "us-east-1a.etcd-events.dev.k8s.orovecchia.com"
+  tags.k8s.io/etcd/events: "" => "us-east-1a/us-east-1a"
+  tags.k8s.io/role/master: "" => "1"
+  type:                    "" => "gp2"[0m
+[0m[1maws_ebs_volume.us-east-1a-etcd-main-dev-k8s-orovecchia-com: Creating...[21m
+  availability_zone:       "" => "us-east-1a"
+  encrypted:               "" => "false"
+  iops:                    "" => "<computed>"
+  kms_key_id:              "" => "<computed>"
+  size:                    "" => "20"
+  snapshot_id:             "" => "<computed>"
+  tags.%:                  "" => "4"
+  tags.KubernetesCluster:  "" => "dev.k8s.orovecchia.com"
+  tags.Name:               "" => "us-east-1a.etcd-main.dev.k8s.orovecchia.com"
+  tags.k8s.io/etcd/main:   "" => "us-east-1a/us-east-1a"
+  tags.k8s.io/role/master: "" => "1"
+  type:                    "" => "gp2"[0m
+[0m[1maws_key_pair.kubernetes-dev-k8s-orovecchia-com-952344bf29bc219a86d3bc12f1767073: Creation complete[21m[0m
+[0m[1maws_iam_role.nodes-dev-k8s-orovecchia-com: Creation complete[21m[0m
+[0m[1maws_iam_role_policy.nodes-dev-k8s-orovecchia-com: Creating...[21m
+  name:   "" => "nodes.dev.k8s.orovecchia.com"
+  policy: "" => "{\n  \"Version\": \"2012-10-17\",\n  \"Statement\": [\n    {\n      \"Effect\": \"Allow\",\n      \"Action\": [\n        \"ec2:Describe*\"\n      ],\n      \"Resource\": [\n        \"*\"\n      ]\n    },\n    {\n      \"Effect\": \"Allow\",\n      \"Action\": [\n        \"route53:*\"\n      ],\n      \"Resource\": [\n        \"*\"\n      ]\n    },\n    {\n      \"Effect\": \"Allow\",\n      \"Action\": [\n        \"ecr:GetAuthorizationToken\",\n        \"ecr:BatchCheckLayerAvailability\",\n        \"ecr:GetDownloadUrlForLayer\",\n        \"ecr:GetRepositoryPolicy\",\n        \"ecr:DescribeRepositories\",\n        \"ecr:ListImages\",\n        \"ecr:BatchGetImage\"\n      ],\n      \"Resource\": [\n        \"*\"\n      ]\n    },\n    {\n      \"Effect\": \"Allow\",\n      \"Action\": [\n        \"s3:*\"\n      ],\n      \"Resource\": [\n        \"arn:aws:s3:::oro-kops-state/dev.k8s.orovecchia.com\",\n        \"arn:aws:s3:::oro-kops-state/dev.k8s.orovecchia.com/*\"\n      ]\n    },\n    {\n      \"Effect\": \"Allow\",\n      \"Action\": [\n        \"s3:GetBucketLocation\",\n        \"s3:ListBucket\"\n      ],\n      \"Resource\": [\n        \"arn:aws:s3:::oro-kops-state\"\n      ]\n    }\n  ]\n}"
+  role:   "" => "nodes.dev.k8s.orovecchia.com"[0m
+[0m[1maws_iam_instance_profile.nodes-dev-k8s-orovecchia-com: Creating...[21m
+  arn:             "" => "<computed>"
+  create_date:     "" => "<computed>"
+  name:            "" => "nodes.dev.k8s.orovecchia.com"
+  path:            "" => "/"
+  roles.#:         "" => "1"
+  roles.241378590: "" => "nodes.dev.k8s.orovecchia.com"
+  unique_id:       "" => "<computed>"[0m
+[0m[1maws_iam_role.masters-dev-k8s-orovecchia-com: Creation complete[21m[0m
+[0m[1maws_iam_role_policy.masters-dev-k8s-orovecchia-com: Creating...[21m
+  name:   "" => "masters.dev.k8s.orovecchia.com"
+  policy: "" => "{\n  \"Version\": \"2012-10-17\",\n  \"Statement\": [\n    {\n      \"Effect\": \"Allow\",\n      \"Action\": [\n        \"ecr:GetAuthorizationToken\",\n        \"ecr:BatchCheckLayerAvailability\",\n        \"ecr:GetDownloadUrlForLayer\",\n        \"ecr:GetRepositoryPolicy\",\n        \"ecr:DescribeRepositories\",\n        \"ecr:ListImages\",\n        \"ecr:BatchGetImage\"\n      ],\n      \"Resource\": [\n        \"*\"\n      ]\n    },\n    {\n      \"Effect\": \"Allow\",\n      \"Action\": [\n        \"ec2:*\"\n      ],\n      \"Resource\": [\n        \"*\"\n      ]\n    },\n    {\n      \"Effect\": \"Allow\",\n      \"Action\": [\n        \"route53:*\"\n      ],\n      \"Resource\": [\n        \"*\"\n      ]\n    },\n    {\n      \"Effect\": \"Allow\",\n      \"Action\": [\n        \"elasticloadbalancing:*\"\n      ],\n      \"Resource\": [\n        \"*\"\n      ]\n    },\n    {\n      \"Effect\": \"Allow\",\n      \"Action\": [\n        \"s3:*\"\n      ],\n      \"Resource\": [\n        \"arn:aws:s3:::oro-kops-state/dev.k8s.orovecchia.com\",\n        \"arn:aws:s3:::oro-kops-state/dev.k8s.orovecchia.com/*\"\n      ]\n    },\n    {\n      \"Effect\": \"Allow\",\n      \"Action\": [\n        \"s3:GetBucketLocation\",\n        \"s3:ListBucket\"\n      ],\n      \"Resource\": [\n        \"arn:aws:s3:::oro-kops-state\"\n      ]\n    }\n  ]\n}"
+  role:   "" => "masters.dev.k8s.orovecchia.com"[0m
+[0m[1maws_iam_instance_profile.masters-dev-k8s-orovecchia-com: Creating...[21m
+  arn:             "" => "<computed>"
+  create_date:     "" => "<computed>"
+  name:            "" => "masters.dev.k8s.orovecchia.com"
+  path:            "" => "/"
+  roles.#:         "" => "1"
+  roles.241661314: "" => "masters.dev.k8s.orovecchia.com"
+  unique_id:       "" => "<computed>"[0m
+[0m[1maws_iam_role_policy.nodes-dev-k8s-orovecchia-com: Creation complete[21m[0m
+[0m[1maws_iam_role_policy.masters-dev-k8s-orovecchia-com: Creation complete[21m[0m
+[0m[1maws_iam_instance_profile.nodes-dev-k8s-orovecchia-com: Creation complete[21m[0m
+[0m[1maws_iam_instance_profile.masters-dev-k8s-orovecchia-com: Creation complete[21m[0m
+[0m[1maws_vpc_dhcp_options.dev-k8s-orovecchia-com: Creation complete[21m[0m
+[0m[1maws_vpc.dev-k8s-orovecchia-com: Creation complete[21m[0m
+[0m[1maws_vpc_dhcp_options_association.dev-k8s-orovecchia-com: Creating...[21m
+  dhcp_options_id: "" => "dopt-023f6d66"
+  vpc_id:          "" => "vpc-7821081f"[0m
+[0m[1maws_internet_gateway.dev-k8s-orovecchia-com: Creating...[21m
+  tags.%:                 "0" => "2"
+  tags.KubernetesCluster: "" => "dev.k8s.orovecchia.com"
+  tags.Name:              "" => "dev.k8s.orovecchia.com"
+  vpc_id:                 "" => "vpc-7821081f"[0m
+[0m[1maws_subnet.us-east-1a-dev-k8s-orovecchia-com: Creating...[21m
+  availability_zone:       "" => "us-east-1a"
+  cidr_block:              "" => "172.20.32.0/19"
+  map_public_ip_on_launch: "" => "false"
+  tags.%:                  "" => "2"
+  tags.KubernetesCluster:  "" => "dev.k8s.orovecchia.com"
+  tags.Name:               "" => "us-east-1a.dev.k8s.orovecchia.com"
+  vpc_id:                  "" => "vpc-7821081f"[0m
+[0m[1maws_route_table.dev-k8s-orovecchia-com: Creating...[21m
+  route.#:                "" => "<computed>"
+  tags.%:                 "" => "2"
+  tags.KubernetesCluster: "" => "dev.k8s.orovecchia.com"
+  tags.Name:              "" => "dev.k8s.orovecchia.com"
+  vpc_id:                 "" => "vpc-7821081f"[0m
+[0m[1maws_security_group.masters-dev-k8s-orovecchia-com: Creating...[21m
+  description:            "" => "Security group for masters"
+  egress.#:               "" => "<computed>"
+  ingress.#:              "" => "<computed>"
+  name:                   "" => "masters.dev.k8s.orovecchia.com"
+  owner_id:               "" => "<computed>"
+  tags.%:                 "" => "2"
+  tags.KubernetesCluster: "" => "dev.k8s.orovecchia.com"
+  tags.Name:              "" => "masters.dev.k8s.orovecchia.com"
+  vpc_id:                 "" => "vpc-7821081f"[0m
+[0m[1maws_security_group.nodes-dev-k8s-orovecchia-com: Creating...[21m
+  description:            "" => "Security group for nodes"
+  egress.#:               "" => "<computed>"
+  ingress.#:              "" => "<computed>"
+  name:                   "" => "nodes.dev.k8s.orovecchia.com"
+  owner_id:               "" => "<computed>"
+  tags.%:                 "" => "2"
+  tags.KubernetesCluster: "" => "dev.k8s.orovecchia.com"
+  tags.Name:              "" => "nodes.dev.k8s.orovecchia.com"
+  vpc_id:                 "" => "vpc-7821081f"[0m
+[0m[1maws_ebs_volume.us-east-1a-etcd-main-dev-k8s-orovecchia-com: Still creating... (10s elapsed)[21m[0m
+[0m[1maws_ebs_volume.us-east-1a-etcd-events-dev-k8s-orovecchia-com: Still creating... (10s elapsed)[21m[0m
+[0m[1maws_vpc_dhcp_options_association.dev-k8s-orovecchia-com: Creation complete[21m[0m
+[0m[1maws_ebs_volume.us-east-1a-etcd-events-dev-k8s-orovecchia-com: Creation complete[21m[0m
+[0m[1maws_subnet.us-east-1a-dev-k8s-orovecchia-com: Creation complete[21m[0m
+[0m[1maws_route_table.dev-k8s-orovecchia-com: Creation complete[21m[0m
+[0m[1maws_route_table_association.us-east-1a-dev-k8s-orovecchia-com: Creating...[21m
+  route_table_id: "" => "rtb-6cd35a0a"
+  subnet_id:      "" => "subnet-9f43bec4"[0m
+[0m[1maws_ebs_volume.us-east-1a-etcd-main-dev-k8s-orovecchia-com: Creation complete[21m[0m
+[0m[1maws_internet_gateway.dev-k8s-orovecchia-com: Creation complete[21m[0m
+[0m[1maws_route_table_association.us-east-1a-dev-k8s-orovecchia-com: Creation complete[21m[0m
+[0m[1maws_route.0-0-0-0--0: Creating...[21m
+  destination_cidr_block:     "" => "0.0.0.0/0"
+  destination_prefix_list_id: "" => "<computed>"
+  gateway_id:                 "" => "igw-dbf906bc"
+  instance_id:                "" => "<computed>"
+  instance_owner_id:          "" => "<computed>"
+  nat_gateway_id:             "" => "<computed>"
+  network_interface_id:       "" => "<computed>"
+  origin:                     "" => "<computed>"
+  route_table_id:             "" => "rtb-6cd35a0a"
+  state:                      "" => "<computed>"[0m
+[0m[1maws_security_group.masters-dev-k8s-orovecchia-com: Creation complete[21m[0m
+[0m[1maws_security_group_rule.https-external-to-master: Creating...[21m
+  cidr_blocks.#:            "" => "1"
+  cidr_blocks.0:            "" => "0.0.0.0/0"
+  from_port:                "" => "443"
+  protocol:                 "" => "tcp"
+  security_group_id:        "" => "sg-e17d289b"
+  self:                     "" => "false"
+  source_security_group_id: "" => "<computed>"
+  to_port:                  "" => "443"
+  type:                     "" => "ingress"[0m
+[0m[1maws_security_group_rule.all-master-to-master: Creating...[21m
+  from_port:                "" => "0"
+  protocol:                 "" => "-1"
+  security_group_id:        "" => "sg-e17d289b"
+  self:                     "" => "false"
+  source_security_group_id: "" => "sg-e17d289b"
+  to_port:                  "" => "0"
+  type:                     "" => "ingress"[0m
+[0m[1maws_security_group_rule.ssh-external-to-master: Creating...[21m
+  cidr_blocks.#:            "" => "1"
+  cidr_blocks.0:            "" => "0.0.0.0/0"
+  from_port:                "" => "22"
+  protocol:                 "" => "tcp"
+  security_group_id:        "" => "sg-e17d289b"
+  self:                     "" => "false"
+  source_security_group_id: "" => "<computed>"
+  to_port:                  "" => "22"
+  type:                     "" => "ingress"[0m
+[0m[1maws_security_group_rule.master-egress: Creating...[21m
+  cidr_blocks.#:            "" => "1"
+  cidr_blocks.0:            "" => "0.0.0.0/0"
+  from_port:                "" => "0"
+  protocol:                 "" => "-1"
+  security_group_id:        "" => "sg-e17d289b"
+  self:                     "" => "false"
+  source_security_group_id: "" => "<computed>"
+  to_port:                  "" => "0"
+  type:                     "" => "egress"[0m
+[0m[1maws_launch_configuration.master-us-east-1a-masters-dev-k8s-orovecchia-com: Creating...[21m
+  associate_public_ip_address:                    "" => "true"
+  ebs_block_device.#:                             "" => "<computed>"
+  ebs_optimized:                                  "" => "<computed>"
+  enable_monitoring:                              "" => "true"
+  ephemeral_block_device.#:                       "" => "1"
+  ephemeral_block_device.3292514005.device_name:  "" => "/dev/sdc"
+  ephemeral_block_device.3292514005.virtual_name: "" => "ephemeral0"
+  iam_instance_profile:                           "" => "masters.dev.k8s.orovecchia.com"
+  image_id:                                       "" => "ami-08ee2f65"
+  instance_type:                                  "" => "m3.large"
+  key_name:                                       "" => "kubernetes.dev.k8s.orovecchia.com-95:23:44:bf:29:bc:21:9a:86:d3:bc:12:f1:76:70:73"
+  name:                                           "" => "<computed>"
+  name_prefix:                                    "" => "master-us-east-1a.masters.dev.k8s.orovecchia.com-"
+  root_block_device.#:                            "" => "1"
+  root_block_device.0.delete_on_termination:      "" => "true"
+  root_block_device.0.iops:                       "" => "<computed>"
+  root_block_device.0.volume_size:                "" => "20"
+  root_block_device.0.volume_type:                "" => "gp2"
+  security_groups.#:                              "" => "1"
+  security_groups.1920077966:                     "" => "sg-e17d289b"
+  user_data:                                      "" => "e2e7c9f61a9d6ff7aba8961fb9539217b262dfd2"[0m
+[0m[1maws_security_group.nodes-dev-k8s-orovecchia-com: Creation complete[21m[0m
+[0m[1maws_security_group_rule.all-node-to-node: Creating...[21m
+  from_port:                "" => "0"
+  protocol:                 "" => "-1"
+  security_group_id:        "" => "sg-e67d289c"
+  self:                     "" => "false"
+  source_security_group_id: "" => "sg-e67d289c"
+  to_port:                  "" => "0"
+  type:                     "" => "ingress"[0m
+[0m[1maws_security_group_rule.all-master-to-node: Creating...[21m
+  from_port:                "" => "0"
+  protocol:                 "" => "-1"
+  security_group_id:        "" => "sg-e67d289c"
+  self:                     "" => "false"
+  source_security_group_id: "" => "sg-e17d289b"
+  to_port:                  "" => "0"
+  type:                     "" => "ingress"[0m
+[0m[1maws_security_group_rule.all-node-to-master: Creating...[21m
+  from_port:                "" => "0"
+  protocol:                 "" => "-1"
+  security_group_id:        "" => "sg-e17d289b"
+  self:                     "" => "false"
+  source_security_group_id: "" => "sg-e67d289c"
+  to_port:                  "" => "0"
+  type:                     "" => "ingress"[0m
+[0m[1maws_security_group_rule.ssh-external-to-node: Creating...[21m
+  cidr_blocks.#:            "" => "1"
+  cidr_blocks.0:            "" => "0.0.0.0/0"
+  from_port:                "" => "22"
+  protocol:                 "" => "tcp"
+  security_group_id:        "" => "sg-e67d289c"
+  self:                     "" => "false"
+  source_security_group_id: "" => "<computed>"
+  to_port:                  "" => "22"
+  type:                     "" => "ingress"[0m
+[0m[1maws_route.0-0-0-0--0: Creation complete[21m[0m
+[0m[1maws_security_group_rule.node-egress: Creating...[21m
+  cidr_blocks.#:            "" => "1"
+  cidr_blocks.0:            "" => "0.0.0.0/0"
+  from_port:                "" => "0"
+  protocol:                 "" => "-1"
+  security_group_id:        "" => "sg-e67d289c"
+  self:                     "" => "false"
+  source_security_group_id: "" => "<computed>"
+  to_port:                  "" => "0"
+  type:                     "" => "egress"[0m
+[0m[1maws_security_group_rule.https-external-to-master: Creation complete[21m[0m
+[0m[1maws_launch_configuration.nodes-dev-k8s-orovecchia-com: Creating...[21m
+  associate_public_ip_address:               "" => "true"
+  ebs_block_device.#:                        "" => "<computed>"
+  ebs_optimized:                             "" => "<computed>"
+  enable_monitoring:                         "" => "true"
+  iam_instance_profile:                      "" => "nodes.dev.k8s.orovecchia.com"
+  image_id:                                  "" => "ami-08ee2f65"
+  instance_type:                             "" => "t2.medium"
+  key_name:                                  "" => "kubernetes.dev.k8s.orovecchia.com-95:23:44:bf:29:bc:21:9a:86:d3:bc:12:f1:76:70:73"
+  name:                                      "" => "<computed>"
+  name_prefix:                               "" => "nodes.dev.k8s.orovecchia.com-"
+  root_block_device.#:                       "" => "1"
+  root_block_device.0.delete_on_termination: "" => "true"
+  root_block_device.0.iops:                  "" => "<computed>"
+  root_block_device.0.volume_size:           "" => "20"
+  root_block_device.0.volume_type:           "" => "gp2"
+  security_groups.#:                         "" => "1"
+  security_groups.3234995862:                "" => "sg-e67d289c"
+  user_data:                                 "" => "2922481b3a0debb2260e4be5b59ae24d31416939"[0m
+[0m[1maws_security_group_rule.all-node-to-node: Creation complete[21m[0m
+[0m[1maws_launch_configuration.master-us-east-1a-masters-dev-k8s-orovecchia-com: Creation complete[21m[0m
+[0m[1maws_autoscaling_group.master-us-east-1a-masters-dev-k8s-orovecchia-com: Creating...[21m
+  arn:                                "" => "<computed>"
+  availability_zones.#:               "" => "<computed>"
+  default_cooldown:                   "" => "<computed>"
+  desired_capacity:                   "" => "<computed>"
+  force_delete:                       "" => "false"
+  health_check_grace_period:          "" => "300"
+  health_check_type:                  "" => "<computed>"
+  launch_configuration:               "" => "master-us-east-1a.masters.dev.k8s.orovecchia.com-201609282006304731484157ff"
+  max_size:                           "" => "1"
+  metrics_granularity:                "" => "1Minute"
+  min_size:                           "" => "1"
+  name:                               "" => "master-us-east-1a.masters.dev.k8s.orovecchia.com"
+  protect_from_scale_in:              "" => "false"
+  tag.#:                              "" => "5"
+  tag.1033606357.key:                 "" => "k8s.io/dns/internal"
+  tag.1033606357.propagate_at_launch: "" => "true"
+  tag.1033606357.value:               "" => "api.internal.dev.k8s.orovecchia.com"
+  tag.1601041186.key:                 "" => "k8s.io/role/master"
+  tag.1601041186.propagate_at_launch: "" => "true"
+  tag.1601041186.value:               "" => "1"
+  tag.2531097064.key:                 "" => "k8s.io/dns/public"
+  tag.2531097064.propagate_at_launch: "" => "true"
+  tag.2531097064.value:               "" => "api.dev.k8s.orovecchia.com"
+  tag.453089870.key:                  "" => "Name"
+  tag.453089870.propagate_at_launch:  "" => "true"
+  tag.453089870.value:                "" => "master-us-east-1a.masters.dev.k8s.orovecchia.com"
+  tag.48875632.key:                   "" => "KubernetesCluster"
+  tag.48875632.propagate_at_launch:   "" => "true"
+  tag.48875632.value:                 "" => "dev.k8s.orovecchia.com"
+  vpc_zone_identifier.#:              "" => "1"
+  vpc_zone_identifier.397707395:      "" => "subnet-9f43bec4"
+  wait_for_capacity_timeout:          "" => "10m"[0m
+[0m[1maws_security_group_rule.ssh-external-to-master: Creation complete[21m[0m
+[0m[1maws_security_group_rule.all-master-to-node: Creation complete[21m[0m
+[0m[1maws_security_group_rule.all-master-to-master: Creation complete[21m[0m
+[0m[1maws_security_group_rule.ssh-external-to-node: Creation complete[21m[0m
+[0m[1maws_security_group_rule.master-egress: Creation complete[21m[0m
+[0m[1maws_launch_configuration.nodes-dev-k8s-orovecchia-com: Creation complete[21m[0m
+[0m[1maws_autoscaling_group.nodes-dev-k8s-orovecchia-com: Creating...[21m
+  arn:                                "" => "<computed>"
+  availability_zones.#:               "" => "<computed>"
+  default_cooldown:                   "" => "<computed>"
+  desired_capacity:                   "" => "<computed>"
+  force_delete:                       "" => "false"
+  health_check_grace_period:          "" => "300"
+  health_check_type:                  "" => "<computed>"
+  launch_configuration:               "" => "nodes.dev.k8s.orovecchia.com-20160928200632508897246s2w"
+  max_size:                           "" => "2"
+  metrics_granularity:                "" => "1Minute"
+  min_size:                           "" => "2"
+  name:                               "" => "nodes.dev.k8s.orovecchia.com"
+  protect_from_scale_in:              "" => "false"
+  tag.#:                              "" => "3"
+  tag.125196166.key:                  "" => "Name"
+  tag.125196166.propagate_at_launch:  "" => "true"
+  tag.125196166.value:                "" => "nodes.dev.k8s.orovecchia.com"
+  tag.1967977115.key:                 "" => "k8s.io/role/node"
+  tag.1967977115.propagate_at_launch: "" => "true"
+  tag.1967977115.value:               "" => "1"
+  tag.48875632.key:                   "" => "KubernetesCluster"
+  tag.48875632.propagate_at_launch:   "" => "true"
+  tag.48875632.value:                 "" => "dev.k8s.orovecchia.com"
+  vpc_zone_identifier.#:              "" => "1"
+  vpc_zone_identifier.397707395:      "" => "subnet-9f43bec4"
+  wait_for_capacity_timeout:          "" => "10m"[0m
+[0m[1maws_security_group_rule.all-node-to-master: Still creating... (10s elapsed)[21m[0m
+[0m[1maws_security_group_rule.node-egress: Still creating... (10s elapsed)[21m[0m
+[0m[1maws_security_group_rule.node-egress: Creation complete[21m[0m
+[0m[1maws_security_group_rule.all-node-to-master: Creation complete[21m[0m
+[0m[1maws_autoscaling_group.master-us-east-1a-masters-dev-k8s-orovecchia-com: Still creating... (10s elapsed)[21m[0m
+[0m[1maws_autoscaling_group.nodes-dev-k8s-orovecchia-com: Still creating... (10s elapsed)[21m[0m
+[0m[1maws_autoscaling_group.master-us-east-1a-masters-dev-k8s-orovecchia-com: Still creating... (20s elapsed)[21m[0m
+[0m[1maws_autoscaling_group.nodes-dev-k8s-orovecchia-com: Still creating... (20s elapsed)[21m[0m
+[0m[1maws_autoscaling_group.master-us-east-1a-masters-dev-k8s-orovecchia-com: Still creating... (30s elapsed)[21m[0m
+[0m[1maws_autoscaling_group.nodes-dev-k8s-orovecchia-com: Still creating... (30s elapsed)[21m[0m
+[0m[1maws_autoscaling_group.master-us-east-1a-masters-dev-k8s-orovecchia-com: Still creating... (40s elapsed)[21m[0m
+[0m[1maws_autoscaling_group.nodes-dev-k8s-orovecchia-com: Still creating... (40s elapsed)[21m[0m
+[0m[1maws_autoscaling_group.master-us-east-1a-masters-dev-k8s-orovecchia-com: Still creating... (50s elapsed)[21m[0m
+[0m[1maws_autoscaling_group.master-us-east-1a-masters-dev-k8s-orovecchia-com: Creation complete[21m[0m
+[0m[1maws_autoscaling_group.nodes-dev-k8s-orovecchia-com: Still creating... (50s elapsed)[21m[0m
+[0m[1maws_autoscaling_group.nodes-dev-k8s-orovecchia-com: Still creating... (1m0s elapsed)[21m[0m
+[0m[1maws_autoscaling_group.nodes-dev-k8s-orovecchia-com: Creation complete[21m[0m
+[0m[1m[32m
+Apply complete! Resources: 32 added, 0 changed, 0 destroyed.[0m
+[0m
+The state of your infrastructure has been saved to the path
+below. This state is required to modify and destroy your
+infrastructure, so keep it safe. To inspect the complete state
+use the `terraform show` command.
+
+State path: terraform.tfstate[0m
+#+end_example
+
+And that is pretty much everything there is to it, I was now able to connect to Kubernetes via kubectl.
+#+BEGIN_SRC sh
+brew install kubectl
+#+END_SRC
+
+#+BEGIN_SRC sh
+kubectl cluster-info
+#+END_SRC
+
+#+RESULTS[77fbaf3bc9f2d50d48c2bfd58f9f91191680b044]:
+: [0;32mKubernetes master[0m is running at [0;33mhttps://api.dev.k8s.orovecchia.com[0m
+: [0;32mKubeDNS[0m is running at [0;33mhttps://api.dev.k8s.orovecchia.com/api/v1/proxy/namespaces/kube-system/services/kube-dns[0m
+
+Now onto creating the application:
+
+
+** Cleanup
+
+#+BEGIN_SRC sh :dir out/terraform
+terraform plan -destroy 
+#+END_SRC
+
+#+RESULTS[e65fc8ec99857055389805a6e6fe5c6a9ed9cc13]:
+#+begin_example
+Refreshing Terraform state in-memory prior to plan...
+The refreshed state will be used to calculate this plan, but
+will not be persisted to local or remote state storage.
+
+[0m[1maws_iam_role.nodes-dev-k8s-orovecchia-com: Refreshing state... (ID: nodes.dev.k8s.orovecchia.com)[0m
+[0m[1maws_iam_role.masters-dev-k8s-orovecchia-com: Refreshing state... (ID: masters.dev.k8s.orovecchia.com)[0m
+[0m[1maws_key_pair.kubernetes-dev-k8s-orovecchia-com-952344bf29bc219a86d3bc12f1767073: Refreshing state... (ID: kubernetes.dev.k8s.orovecchia.com-95:23:44:bf:29:bc:21:9a:86:d3:bc:12:f1:76:70:73)[0m
+[0m[1maws_vpc.dev-k8s-orovecchia-com: Refreshing state... (ID: vpc-7821081f)[0m
+[0m[1maws_ebs_volume.us-east-1a-etcd-main-dev-k8s-orovecchia-com: Refreshing state... (ID: vol-192822be)[0m
+[0m[1maws_ebs_volume.us-east-1a-etcd-events-dev-k8s-orovecchia-com: Refreshing state... (ID: vol-3d28229a)[0m
+[0m[1maws_vpc_dhcp_options.dev-k8s-orovecchia-com: Refreshing state... (ID: dopt-023f6d66)[0m
+[0m[1maws_iam_role_policy.masters-dev-k8s-orovecchia-com: Refreshing state... (ID: masters.dev.k8s.orovecchia.com:masters.dev.k8s.orovecchia.com)[0m
+[0m[1maws_iam_instance_profile.masters-dev-k8s-orovecchia-com: Refreshing state... (ID: masters.dev.k8s.orovecchia.com)[0m
+[0m[1maws_iam_instance_profile.nodes-dev-k8s-orovecchia-com: Refreshing state... (ID: nodes.dev.k8s.orovecchia.com)[0m
+[0m[1maws_iam_role_policy.nodes-dev-k8s-orovecchia-com: Refreshing state... (ID: nodes.dev.k8s.orovecchia.com:nodes.dev.k8s.orovecchia.com)[0m
+[0m[1maws_internet_gateway.dev-k8s-orovecchia-com: Refreshing state... (ID: igw-dbf906bc)[0m
+[0m[1maws_vpc_dhcp_options_association.dev-k8s-orovecchia-com: Refreshing state... (ID: dopt-023f6d66-vpc-7821081f)[0m
+[0m[1maws_security_group.nodes-dev-k8s-orovecchia-com: Refreshing state... (ID: sg-e67d289c)[0m
+[0m[1maws_subnet.us-east-1a-dev-k8s-orovecchia-com: Refreshing state... (ID: subnet-9f43bec4)[0m
+[0m[1maws_route_table.dev-k8s-orovecchia-com: Refreshing state... (ID: rtb-6cd35a0a)[0m
+[0m[1maws_security_group.masters-dev-k8s-orovecchia-com: Refreshing state... (ID: sg-e17d289b)[0m
+[0m[1maws_security_group_rule.node-egress: Refreshing state... (ID: sgrule-2872475010)[0m
+[0m[1maws_security_group_rule.ssh-external-to-node: Refreshing state... (ID: sgrule-71065845)[0m
+[0m[1maws_security_group_rule.all-node-to-node: Refreshing state... (ID: sgrule-30692617)[0m
+[0m[1maws_launch_configuration.nodes-dev-k8s-orovecchia-com: Refreshing state... (ID: nodes.dev.k8s.orovecchia.com-20160928200632508897246s2w)[0m
+[0m[1maws_route.0-0-0-0--0: Refreshing state... (ID: r-rtb-6cd35a0a1080289494)[0m
+[0m[1maws_route_table_association.us-east-1a-dev-k8s-orovecchia-com: Refreshing state... (ID: rtbassoc-9441fbed)[0m
+[0m[1maws_security_group_rule.master-egress: Refreshing state... (ID: sgrule-3088574993)[0m
+[0m[1maws_security_group_rule.all-master-to-node: Refreshing state... (ID: sgrule-1685541623)[0m
+[0m[1maws_security_group_rule.https-external-to-master: Refreshing state... (ID: sgrule-3920636886)[0m
+[0m[1maws_security_group_rule.ssh-external-to-master: Refreshing state... (ID: sgrule-1693229204)[0m
+[0m[1maws_security_group_rule.all-master-to-master: Refreshing state... (ID: sgrule-1006626549)[0m
+[0m[1maws_security_group_rule.all-node-to-master: Refreshing state... (ID: sgrule-1583145227)[0m
+[0m[1maws_launch_configuration.master-us-east-1a-masters-dev-k8s-orovecchia-com: Refreshing state... (ID: master-us-east-1a.masters.dev.k8s.orovecchia.com-201609282006304731484157ff)[0m
+[0m[1maws_autoscaling_group.nodes-dev-k8s-orovecchia-com: Refreshing state... (ID: nodes.dev.k8s.orovecchia.com)[0m
+[0m[1maws_autoscaling_group.master-us-east-1a-masters-dev-k8s-orovecchia-com: Refreshing state... (ID: master-us-east-1a.masters.dev.k8s.orovecchia.com)[0m
+
+The Terraform execution plan has been generated and is shown below.
+Resources are shown in alphabetical order for quick scanning. Green resources
+will be created (or destroyed and then created if an existing resource
+exists), yellow resources are being changed in-place, and red resources
+will be destroyed. Cyan entries are data sources to be read.
+
+Note: You didn't specify an "-out" parameter to save this plan, so when
+"apply" is called, Terraform can't guarantee this is what will execute.
+
+[31m- aws_autoscaling_group.master-us-east-1a-masters-dev-k8s-orovecchia-com
+[0m[0m
+[0m[31m- aws_autoscaling_group.nodes-dev-k8s-orovecchia-com
+[0m[0m
+[0m[31m- aws_ebs_volume.us-east-1a-etcd-events-dev-k8s-orovecchia-com
+[0m[0m
+[0m[31m- aws_ebs_volume.us-east-1a-etcd-main-dev-k8s-orovecchia-com
+[0m[0m
+[0m[31m- aws_iam_instance_profile.masters-dev-k8s-orovecchia-com
+[0m[0m
+[0m[31m- aws_iam_instance_profile.nodes-dev-k8s-orovecchia-com
+[0m[0m
+[0m[31m- aws_iam_role.masters-dev-k8s-orovecchia-com
+[0m[0m
+[0m[31m- aws_iam_role.nodes-dev-k8s-orovecchia-com
+[0m[0m
+[0m[31m- aws_iam_role_policy.masters-dev-k8s-orovecchia-com
+[0m[0m
+[0m[31m- aws_iam_role_policy.nodes-dev-k8s-orovecchia-com
+[0m[0m
+[0m[31m- aws_internet_gateway.dev-k8s-orovecchia-com
+[0m[0m
+[0m[31m- aws_key_pair.kubernetes-dev-k8s-orovecchia-com-952344bf29bc219a86d3bc12f1767073
+[0m[0m
+[0m[31m- aws_launch_configuration.master-us-east-1a-masters-dev-k8s-orovecchia-com
+[0m[0m
+[0m[31m- aws_launch_configuration.nodes-dev-k8s-orovecchia-com
+[0m[0m
+[0m[31m- aws_route.0-0-0-0--0
+[0m[0m
+[0m[31m- aws_route_table.dev-k8s-orovecchia-com
+[0m[0m
+[0m[31m- aws_route_table_association.us-east-1a-dev-k8s-orovecchia-com
+[0m[0m
+[0m[31m- aws_security_group.masters-dev-k8s-orovecchia-com
+[0m[0m
+[0m[31m- aws_security_group.nodes-dev-k8s-orovecchia-com
+[0m[0m
+[0m[31m- aws_security_group_rule.all-master-to-master
+[0m[0m
+[0m[31m- aws_security_group_rule.all-master-to-node
+[0m[0m
+[0m[31m- aws_security_group_rule.all-node-to-master
+[0m[0m
+[0m[31m- aws_security_group_rule.all-node-to-node
+[0m[0m
+[0m[31m- aws_security_group_rule.https-external-to-master
+[0m[0m
+[0m[31m- aws_security_group_rule.master-egress
+[0m[0m
+[0m[31m- aws_security_group_rule.node-egress
+[0m[0m
+[0m[31m- aws_security_group_rule.ssh-external-to-master
+[0m[0m
+[0m[31m- aws_security_group_rule.ssh-external-to-node
+[0m[0m
+[0m[31m- aws_subnet.us-east-1a-dev-k8s-orovecchia-com
+[0m[0m
+[0m[31m- aws_vpc.dev-k8s-orovecchia-com
+[0m[0m
+[0m[31m- aws_vpc_dhcp_options.dev-k8s-orovecchia-com
+[0m[0m
+[0m[31m- aws_vpc_dhcp_options_association.dev-k8s-orovecchia-com
+[0m[0m
+[0m
+[0m[1mPlan:[0m 0 to add, 0 to change, 32 to destroy.[0m
+#+end_example
+
+#+BEGIN_SRC sh :dir out/terraform
+terraform destroy -force
+#+END_SRC
+
+#+RESULTS[1a1893ac337603c3ae785a464b0f46548ee80b89]:
+#+BEGIN_EXAMPLE
+[31mError applying plan:
+
+2 error(s) occurred:
+
+* aws_ebs_volume.us-east-1a-etcd-events-dev-k8s-orovecchia-com: Error deleting EC2 volume vol-3d28229a: VolumeInUse: Volume vol-3d28229a is currently attached to i-1a27720c
+	status code: 400, request id: a1df6173-5f72-4c43-90d4-8a723f32dcd4
+* aws_ebs_volume.us-east-1a-etcd-main-dev-k8s-orovecchia-com: Error deleting EC2 volume vol-192822be: VolumeInUse: Volume vol-192822be is currently attached to i-1a27720c
+	status code: 400, request id: 1ce03a4f-1b81-4868-9586-57047ffb1afa
+
+Terraform does not automatically rollback in the face of errors.
+Instead, your Terraform state file has been partially updated with
+any resources that successfully completed. Please address the error
+above and apply again to incrementally change your infrastructure.[0m[0m
+#+END_EXAMPLE
+
+Oh well, looks like Terraform (or rather, AWS) did not update its state soon enough. No issue though, you can simply rerun the command.
+#+BEGIN_SRC sh :dir out/terraform
+terraform destroy -force
+#+END_SRC
+
+#+RESULTS:
+| [0m[1maws_ebs_volume.us-east-1a-etcd-main-dev-k8s-orovecchia-com:   | Refreshing               | state...            | (ID: | vol-192822be)[0m |
+| [0m[1maws_ebs_volume.us-east-1a-etcd-events-dev-k8s-orovecchia-com: | Refreshing               | state...            | (ID: | vol-3d28229a)[0m |
+| [0m[1maws_ebs_volume.us-east-1a-etcd-events-dev-k8s-orovecchia-com: | Destroying...[21m[0m |                     |      |                    |
+| [0m[1maws_ebs_volume.us-east-1a-etcd-main-dev-k8s-orovecchia-com:   | Destroying...[21m[0m |                     |      |                    |
+| [0m[1maws_ebs_volume.us-east-1a-etcd-main-dev-k8s-orovecchia-com:   | Destruction              | complete[21m[0m |      |                    |
+| [0m[1maws_ebs_volume.us-east-1a-etcd-events-dev-k8s-orovecchia-com: | Destruction              | complete[21m[0m |      |                    |
+| [0m[1m[32m                                                        |                          |                     |      |                    |
+| Destroy                                                                 | complete!                | Resources:          | 2    | destroyed.[0m    |
+
+Voila. However, Kubernetes [[https://github.com/kubernetes/kops/blob/master/docs/terraform.md][reccomends]] to also use Kops to delete the cluster to make sure that any potential ELBs or volumes resulted during the usage of Kubernetes are cleaned up as well.
+#+BEGIN_SRC sh
+~/golang/bin/kops delete cluster --yes dev.k8s.orovecchia.com --state=s3://oro-kops-state 
+#+END_SRC
+
+#+RESULTS:
+| TYPE    NAME              ID                                                                                                                    |
+| instance  master-us-east-1a.masters.dev.k8s.orovecchia.com  i-1a27720c                                                                          |
+| instance  nodes.dev.k8s.orovecchia.com        i-6827727e                                                                                        |
+| instance  nodes.dev.k8s.orovecchia.com        i-6b27727d                                                                                        |
+| route53-record  api.dev.k8s.orovecchia.com.        Z3G80U22J6KITI/api.dev.k8s.orovecchia.com.                                                   |
+| route53-record  api.internal.dev.k8s.orovecchia.com.      Z3G80U22J6KITI/api.internal.dev.k8s.orovecchia.com.                                   |
+| route53-record  etcd-events-us-east-1a.internal.dev.k8s.orovecchia.com.  Z3G80U22J6KITI/etcd-events-us-east-1a.internal.dev.k8s.orovecchia.com. |
+| route53-record  etcd-us-east-1a.internal.dev.k8s.orovecchia.com.  Z3G80U22J6KITI/etcd-us-east-1a.internal.dev.k8s.orovecchia.com.               |
+|                                                                                                                                                 |
+| route53-record:Z3G80U22J6KITI/etcd-us-east-1a.internal.dev.k8s.orovecchia.com.  ok                                                              |
+| instance:i-6827727e  ok                                                                                                                         |
+| instance:i-1a27720c  ok                                                                                                                         |
+| instance:i-6b27727d  ok                                                                                                                         |
+|                                                                                                                                                 |
+| Cluster deleted                                                                                                                                 |
 
 * Footnotes
 
