@@ -1,21 +1,27 @@
-* Bootstrapping an auto scaling web application within AWS with Terraform
+* Bootstrapping an auto scaling web application within AWS Kubernetes
   :PROPERTIES:
   :header-args: :results output verbatim  :cache yes :exports both
   :END:
-** Prerequisites
+ 
+Let's create a state-of-the-art deployment pipeline for cloud native applications. In this guide, I'll be using Kubernetes on AWS to bootstrap a load-balanced, static-files only web application. This is serious overkill for such an application, however this will showcase several necessities when designing such a system for more sophisticated applications.
 This guide assumes you are using OSX. You also need to be familiar with both [[http://brew.sh/index.html][homebrew]] and AWS.
-First, I've made sure terraform is up to date
+** About the tools
+- [[http://kubernetes.io/][Kubernetes]] :: A Google-developed container cluster scheduler
+- [[https://www.terraform.io/intro/getting-started/build.html][Terraform]]  :: A Hashicorp-developed infrastructure-as-code tool
+
+** Getting to know Terraform
+   To bootstrap Kubernetes, I will be using Kops. Kops internally uses Terraform to bootstrap a Kubernetes cluster.
+First, I've made sure Terraform is up to date
 #+BEGIN_SRC sh  
 brew update
-brew install terraform
+brew install Terraform
 #+END_SRC
 
 #+RESULTS[fe6c2689e91e6d061c66b63dbc04577128b5eefd]:
 : Already up-to-date.
 
-** Initial check to make sure terraform works
-To make sure my AWS credentials (saved in $HOME/.aws/credentials) were picked up by terraform, I've created an initial, bare-bones terraform config (which is pretty much taken verbatim from the [[https://www.terraform.io/intro/getting-started/build.html][Terraform Getting Started Guide]])
-#+BEGIN_SRC terraform :tangle 1-initial/init.tf
+To make sure my AWS credentials (saved in $HOME/.aws/credentials) were picked up by Terraform, I've created an initial, bare-bones Terraform config (which is pretty much taken verbatim from the [[https://www.terraform.io/intro/getting-started/build.html][Terraform Getting Started Guide]])
+#+BEGIN_SRC Terraform :tangle 1-initial/init.tf
 provider "aws" {}
 
 resource "aws_instance" "example" {
@@ -25,7 +31,7 @@ resource "aws_instance" "example" {
 #+END_SRC
 planned[fn:1] 
 #+BEGIN_SRC sh
-terraform plan 1-initial
+Terraform plan 1-initial
 #+END_SRC
 
 #+RESULTS[e587d1b52e207580b608bcbe150acd2c44730415]:
@@ -77,7 +83,7 @@ Note: You didn't specify an "-out" parameter to save this plan, so when
 
 and applied it
 #+BEGIN_SRC sh
-terraform apply 1-initial
+Terraform apply 1-initial
 #+END_SRC
 
 #+RESULTS[7712e5563c62e780e4b29a71e78c646fd51dd78d]:
@@ -117,14 +123,14 @@ Apply complete! Resources: 1 added, 0 changed, 0 destroyed.[0m
 The state of your infrastructure has been saved to the path
 below. This state is required to modify and destroy your
 infrastructure, so keep it safe. To inspect the complete state
-use the `terraform show` command.
+use the `Terraform show` command.
 
-State path: terraform.tfstate[0m
+State path: Terraform.tfstate[0m
 #+end_example
 
-That looks promising, and with a quick glance at the AWS console I could confirm that terraform had indeed boostrapped a t2.micro instance in the us-east-1. I destroyed it quickly afterwards to incur little to no costs via
+That looks promising, and with a quick glance at the AWS console I could confirm that Terraform had indeed boostrapped a t2.micro instance in the us-east-1. I destroyed it quickly afterwards to incur little to no costs via
 #+BEGIN_SRC sh
-terraform destroy -force 1-initial
+Terraform destroy -force 1-initial
 #+END_SRC
 
 #+RESULTS[7bd50d0841515b3685d28efe1f88969c17d6ac92]:
@@ -145,28 +151,22 @@ terraform destroy -force 1-initial
 Destroy complete! Resources: 1 destroyed.[0m
 #+end_example
 
-** Alright, let's get to work
-The target architecture looks roughly as follows
-#+BEGIN_SRC dot :file arch.png
-digraph vpc{
-        rankdir="BT";
-        {rank=same; ELB EIP }
+** Alright, Terraform looks good, let's get to work
+Now that I have a basic understanding of Terraform, let's get to using it. As initially said, we are going to use Kops to bootstrap our cluster, so let's get it installed via the instructions found at [[https://github.com/kubernetes/kops][the project's GitHub repo]].
+#+BEGIN_SRC sh
+export GOPATH=$HOME/golang/
+mkdir -p $GOPATH
+go get -u -d k8s.io/kops
+#+END_SRC
+This timed out for me, several times. Running =go get= with =-u= allows you to rerun the same query again, hopefully without timing out.
 
-        EC2 [color="blue"];
-        EC2->ELB [dir="back",arrowtail="normal"];
-        ELB->VPC;
-        Bastion->VPC;
-        Bastion->EC2;
-        EIP->Bastion;
-        EC2->ASG [dir="forward",arrowhead="none",arrowtail="normal",taillabel="2.."];
-        ASG->VPC;
-}
+Afterwards, I built the binary
+#+BEGIN_SRC sh
+cd ${GOPATH}/src/k8s.io/kops/
+make
 #+END_SRC
 
-#+RESULTS[34dd8e31093ce2945b29b350e86652d00c747af7]:
-[[file:arch.png]]
 
-Note that the EC2 instances are not going to be created via terraform, but rather via the auto scaling group's launch configuration (not pictured).
 * Footnotes
 
-[fn:1] Note that the output might look weird. I could not get emacs to work well with the escape characters terraform uses to e.g. make its text bold.
+[fn:1] Note that the output might look weird. I could not get emacs to work well with the escape characters Terraform uses to e.g. make its text bold.
