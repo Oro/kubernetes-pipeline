@@ -14,14 +14,14 @@ This guide assumes you are using OSX. You also need to be familiar with both [[h
 First, I've made sure Terraform is up to date
 #+BEGIN_SRC sh  
 brew update
-brew install Terraform
+brew install terraform
 #+END_SRC
 
 #+RESULTS[fe6c2689e91e6d061c66b63dbc04577128b5eefd]:
 : Already up-to-date.
 
 To make sure my AWS credentials (saved in $HOME/.aws/credentials) were picked up by Terraform, I've created an initial, bare-bones Terraform config (which is pretty much taken verbatim from the [[https://www.terraform.io/intro/getting-started/build.html][Terraform Getting Started Guide]])
-#+BEGIN_SRC Terraform :tangle 1-initial/init.tf
+#+BEGIN_SRC terraform :tangle 1-initial/init.tf
 provider "aws" {}
 
 resource "aws_instance" "example" {
@@ -31,7 +31,7 @@ resource "aws_instance" "example" {
 #+END_SRC
 planned[fn:1] 
 #+BEGIN_SRC sh
-Terraform plan 1-initial
+terraform plan 1-initial
 #+END_SRC
 
 #+RESULTS[e587d1b52e207580b608bcbe150acd2c44730415]:
@@ -83,7 +83,7 @@ Note: You didn't specify an "-out" parameter to save this plan, so when
 
 and applied it
 #+BEGIN_SRC sh
-Terraform apply 1-initial
+terraform apply 1-initial
 #+END_SRC
 
 #+RESULTS[7712e5563c62e780e4b29a71e78c646fd51dd78d]:
@@ -130,7 +130,7 @@ State path: Terraform.tfstate[0m
 
 That looks promising, and with a quick glance at the AWS console I could confirm that Terraform had indeed boostrapped a t2.micro instance in the us-east-1. I destroyed it quickly afterwards to incur little to no costs via
 #+BEGIN_SRC sh
-Terraform destroy -force 1-initial
+terraform destroy -force 1-initial
 #+END_SRC
 
 #+RESULTS[7bd50d0841515b3685d28efe1f88969c17d6ac92]:
