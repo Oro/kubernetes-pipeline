@@ -1,4 +1,4 @@
-* Bootstrapping an auto scaling web application within AWS Kubernetes
+* Bootstrapping an auto scaling web application within AWS via Kubernetes
   :PROPERTIES:
   :header-args: :results output verbatim  :cache yes :exports both
   :END:
