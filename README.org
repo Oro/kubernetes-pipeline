@@ -966,7 +966,9 @@ kubectl cluster-info
 
 Now onto creating the application:
 
-
+** Creating our application
+** Building our pipeline
+** Putting everything together
 ** Cleanup
 
 #+BEGIN_SRC sh :dir out/terraform
@@ -1099,9 +1101,9 @@ terraform destroy -force
 
 2 error(s) occurred:
 
-* aws_ebs_volume.us-east-1a-etcd-events-dev-k8s-orovecchia-com: Error deleting EC2 volume vol-3d28229a: VolumeInUse: Volume vol-3d28229a is currently attached to i-1a27720c
+ aws_ebs_volume.us-east-1a-etcd-events-dev-k8s-orovecchia-com: Error deleting EC2 volume vol-3d28229a: VolumeInUse: Volume vol-3d28229a is currently attached to i-1a27720c
 	status code: 400, request id: a1df6173-5f72-4c43-90d4-8a723f32dcd4
-* aws_ebs_volume.us-east-1a-etcd-main-dev-k8s-orovecchia-com: Error deleting EC2 volume vol-192822be: VolumeInUse: Volume vol-192822be is currently attached to i-1a27720c
+ aws_ebs_volume.us-east-1a-etcd-main-dev-k8s-orovecchia-com: Error deleting EC2 volume vol-192822be: VolumeInUse: Volume vol-192822be is currently attached to i-1a27720c
 	status code: 400, request id: 1ce03a4f-1b81-4868-9586-57047ffb1afa
 
 Terraform does not automatically rollback in the face of errors.
