@@ -160,8 +160,6 @@ mkdir -p $GOPATH
 go get -d k8s.io/kops
 #+END_SRC
 
-#+RESULTS[b684f174f19196c3a2fc72abc258007591567ce1]:
-
 This timed out for me, several times. Running =go get= with =-u= allowed me to rerun the same query again and again. This happened during the time my ISP was having some troubles, so your mileage will vary.
 
 Afterwards, I built the binary
