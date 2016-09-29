@@ -1159,6 +1159,87 @@ However, at first I was using the =internal/docker-push= step, which resulted in
 Now all that's left is to publish this to our Kubernetes cluster.
 
 ** Putting everything together
+   For the last step, we are going to add the deployment to our Kubernetes cluster into the =wercker.yml=. This again needs several environment variables which will be set at the Wercker GUI.
+#+BEGIN_SRC yaml :tangle webpage/wercker.yml
+
+kube-deploy:
+  steps:
+    - create-file:
+      name: Create ca.pem
+      cwd: deployment
+      filename: ca.pem
+      content: $CA_PEM
+
+    - create-file:
+      name: Create admin.pem
+      cwd: deployment
+      filename: admin.pem
+      content: $ADMIN_PEM
+
+    - create-file:
+      name: Create admin-key.pem
+      cwd: deployment
+      filename: admin-key.pem
+      content: $ADMIN_KEY_PEM        
+
+    - kubectl:
+      cwd: deployment
+      server: $KUBERNETES_MASTER
+      certificate-authority: ca.pem
+      client-certificate: admin.pem
+      client-key: admin-key.pem
+      command: apply -f kube.yml
+
+    - script:
+      name: cleanup
+      cwd: deployment
+      code: rm -rf ca.pem admin.pem admin-key.pem kube.yml
+
+#+END_SRC
+Additionally, I've added the =kube.yml= file which contains [[http://kubernetes.io/docs/user-guide/services/][service]] and [[http://kubernetes.io/docs/user-guide/deployments/][deployment]] definitions for Kubernetes.
+#+BEGIN_SRC yaml :tangle webpage/kube.yml
+---
+kind: Service
+apiVersion: v1
+metadata:
+  name: orohttp
+  labels:
+    name: orohttp
+spec:
+  ports:
+    - port: 80
+      targetPort: http-server
+      protocol: TCP
+  type: LoadBalancer
+  selector:
+    name: orohttp
+    branch: ${WERCKER_GIT_BRANCH}
+    commit: ${WERCKER_GIT_COMMIT}
+---
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: orohttp
+  labels:
+    name: orohttp
+spec:
+  replicas: 2
+  template:
+    metadata:
+      labels:
+        name: orohttp
+        branch: ${WERCKER_GIT_BRANCH}
+        commit: ${WERCKER_GIT_COMMIT}
+    spec:
+      containers:
+      - name: orohttp
+        image: oronu/nginx-simple-html:master:${WERCKER_GIT_COMMIT}
+        ports:
+        - name: http-server
+          containerPort: 8080
+          protocol: TCP
+#+END_SRC
+This definition will result in all commits to all branches being automatically deployed. Different branches however will get different loadbalancers and therefore different DNS addresses. 
 ** Cleanup
 
 #+BEGIN_SRC sh :dir out/terraform
