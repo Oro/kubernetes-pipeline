@@ -967,7 +967,175 @@ kubectl cluster-info
 Now onto creating the application:
 
 ** Creating our application
-** Building our pipeline
+For our demo application, we are going to use a simple (static) web page. Let's bundle this into a Docker container. First, our site itself:
+#+BEGIN_SRC html :tangle webpage/static/index.html
+ <!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8">
+    <title>Hello there</title>
+  </head>
+  <body>
+ Automation for the People 
+  </body>
+</html>
+#+END_SRC
+
+Not very sophisticated, but it get's the job done. Let's use golang as our http server (again, this is just for demonstration purposes; If you are really thinking about doing something THAT complicated just to serve a static web page, have a look at [[http://blog.oro.nu/post/deploying-hugo-with-vagrant-and-saltstack/][this blog post]] instead. Still complex, but far less convoluted.)
+#+BEGIN_SRC go :tangle webpage/app.go
+  package main
+
+  import (
+    "log"
+    "net/http"
+  )
+
+  func main() {
+    fs := http.FileServer(http.Dir("static"))
+    http.Handle("/", fs)
+    log.Println("Listening on 8080...")
+    http.ListenAndServe(":8080", nil)
+  }
+#+END_SRC
+
+And our build instructions, courtesy of Wercker
+#+BEGIN_SRC yaml :tangle webpage/wercker.yml
+box: golang
+dev:
+  steps:
+    - setup-go-workspace:
+        package-dir: ./
+
+    - internal/watch:
+        code: |
+          go build -o app ./...
+          ./app
+        reload: true
+
+build:
+  steps:
+    - setup-go-workspace:
+        package-dir: ./
+
+    - golint
+
+    - script:
+        name: go build
+        code: |
+          go build -o app ./...
+
+    - script:
+        name: go test
+        code: |
+          go test ./...
+
+#+END_SRC
+
+#+BEGIN_SRC sh :dir webpage :cache no
+wercker dev --publish 8080
+#+END_SRC
+This wercker file + command will automatically reload our local dev environment when we change things, so it will come in quite handy once we start developing new features. I can now access the page running on localhost:8080
+#+BEGIN_SRC http
+GET http://localhost:8080
+#+END_SRC
+
+#+RESULTS[f55c07ca7ef544e097580a71c3dfed973f827b7d]:
+#+begin_example
+HTTP/1.1 200 OK
+Accept-Ranges: bytes
+Content-Length: 155
+Content-Type: text/html; charset=utf-8
+Last-Modified: Thu, 29 Sep 2016 19:23:33 GMT
+Date: Thu, 29 Sep 2016 19:23:40 GMT
+
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8">
+    <title>Hello there</title>
+  </head>
+  <body>
+ Automation for the People 
+  </body>
+</html>
+#+end_example
+
+Also, a =wercker build= will trigger a complete build step, including linting and testing (which we do not have yet).
+
+
+Now, building locally is nice, however we'd like to create a complete pipeline, so that our CI server can also do the builds. Thankfully, with our =wercker.yml= file we already did that. All that is now needed is to add our repository into [[https://app.wercker.com/Haftcreme/simple-nginx-on-docker/runs][our wercker account]] and it should automatically trigger after a git push.
+
+Let's have a look via the REST API (the most important part, the =result= that passed)
+#+BEGIN_SRC restclient
+GET https://app.wercker.com/api/v3/runs/57ed6b9318c4c70100453a9e
+#+END_SRC
+
+#+RESULTS[76ca77ee235bd0e7924b63e563a670489f9061a9]:
+#+BEGIN_SRC js
+{
+  "pipeline": {
+    "type": "git",
+    "setScmProviderStatus": true,
+    "pipelineName": "build",
+    "permissions": "public",
+    "name": "build",
+    "createdAt": "2016-09-29T17:40:25.546Z",
+    "url": "https://app.wercker.com/api/v3/pipelines/57ed520918c4c70100451ad8",
+    "id": "57ed520918c4c70100451ad8"
+  },
+  "user": {
+    "type": "wercker",
+    "name": "Haftcreme",
+    "avatar": {
+      "gravatar": "26b1d4db0a76cdfbc2e95fff776b01fd"
+    },
+    "userId": "56df0dae1618a4fe2c13ed78",
+    "meta": {
+      "username": "Haftcreme",
+      "type": "user",
+      "werckerEmployee": false
+    }
+  },
+  "status": "finished",
+  "startedAt": "2016-09-29T19:29:25.322Z",
+  "result": "passed",
+  "progress": 100,
+  "commits": [
+    {
+      "_id": "57ed6b9318c4c70100453a9f",
+      "message": "wercker file",
+      "commit": "01c72c62576fc1193753f8080b7acda38796936c",
+      "by": "Marco Orovecchia"
+    }
+  ],
+  "message": "wercker file",
+  "finishedAt": "2016-09-29T19:29:39.694Z",
+  "envVars": [],
+  "createdAt": "2016-09-29T19:29:23.560Z",
+  "commitHash": "01c72c62576fc1193753f8080b7acda38796936c",
+  "branch": "master",
+  "url": "https://app.wercker.com/api/v3/runs/57ed6b9318c4c70100453a9e",
+  "id": "57ed6b9318c4c70100453a9e"
+}
+// GET https://app.wercker.com/api/v3/runs/57ed6b9318c4c70100453a9e
+// HTTP/1.1 200 OK
+// Content-Type: application/json; charset=utf-8
+// Date: Thu, 29 Sep 2016 19:33:10 GMT
+// ETag: W/"dd2QmuFCQuPQ1248Bk11Zw=="
+// Server: nginx
+// Strict-Transport-Security: max-age=10886400; includeSubDomains; preload
+// Vary: Accept-Encoding
+// Vary: Accept-Encoding
+// X-Content-Type-Options: nosniff
+// X-Frame-Options: DENY
+// X-Powered-By: Express
+// Content-Length: 1001
+// Connection: keep-alive
+// Request duration: 0.716355s
+#+END_SRC
+
+
+** Building our deployment pipeline
 ** Putting everything together
 ** Cleanup
 
