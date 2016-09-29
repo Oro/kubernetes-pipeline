@@ -1140,7 +1140,6 @@ GET https://app.wercker.com/api/v3/runs/57ed6b9318c4c70100453a9e
 // Request duration: 0.716355s
 #+END_SRC
 
-
 ** Building our deployment pipeline
 Now that we've build our application, we still need a place to store the artifacts. For this, we are going to use the [[https://hub.docker.com/r/oronu/nginx-simple-html/][Docker Registry]] by Docker.
 I've added the deploy step to the =wercker.yml= and the two environment variables, =USERNAME= and =PASSWORD= via the Wercker GUI. 
