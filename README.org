@@ -1031,7 +1031,7 @@ build:
     - script:
         name: copy to output dir
         code: |
-          cp -r source/static app $WERCKER_OUTPUT_DIR
+          cp -r source/static source/kube.yml app $WERCKER_OUTPUT_DIR
 
 #+END_SRC
 
@@ -1164,37 +1164,19 @@ Now all that's left is to publish this to our Kubernetes cluster.
 
 kube-deploy:
   steps:
-    - create-file:
-      name: Create ca.pem
-      cwd: deployment
-      filename: ca.pem
-      content: $CA_PEM
-
-    - create-file:
-      name: Create admin.pem
-      cwd: deployment
-      filename: admin.pem
-      content: $ADMIN_PEM
-
-    - create-file:
-      name: Create admin-key.pem
-      cwd: deployment
-      filename: admin-key.pem
-      content: $ADMIN_KEY_PEM        
-
-    - kubectl:
-      cwd: deployment
-      server: $KUBERNETES_MASTER
-      certificate-authority: ca.pem
-      client-certificate: admin.pem
-      client-key: admin-key.pem
-      command: apply -f kube.yml
-
     - script:
-      name: cleanup
-      cwd: deployment
-      code: rm -rf ca.pem admin.pem admin-key.pem kube.yml
-
+      name: generate kube file
+      code: |
+        eval "cat <<EOF
+        $(cat "$WERCKER_SOURCE_DIR/kube.yml")
+        EOF" > kube-gen.yml
+        cat kube-gen.yml
+    - kubectl:
+      server: $KUBERNETES_MASTER
+      username: $KUBERNETES_USERNAME
+      password: $KUBERNETES_PASSWORD
+      insecure-skip-tls-verify: true
+      command: apply -f kube-gen.yml
 #+END_SRC
 Additionally, I've added the =kube.yml= file which contains [[http://kubernetes.io/docs/user-guide/services/][service]] and [[http://kubernetes.io/docs/user-guide/deployments/][deployment]] definitions for Kubernetes.
 #+BEGIN_SRC yaml :tangle webpage/kube.yml
@@ -1202,9 +1184,7 @@ Additionally, I've added the =kube.yml= file which contains [[http://kubernetes.
 kind: Service
 apiVersion: v1
 metadata:
-  name: orohttp
-  labels:
-    name: orohttp
+  name: orohttp-${WERCKER_GIT_BRANCH}
 spec:
   ports:
     - port: 80
@@ -1212,34 +1192,77 @@ spec:
       protocol: TCP
   type: LoadBalancer
   selector:
-    name: orohttp
+    name: orohttp-${WERCKER_GIT_BRANCH}
     branch: ${WERCKER_GIT_BRANCH}
     commit: ${WERCKER_GIT_COMMIT}
 ---
 apiVersion: extensions/v1beta1
 kind: Deployment
 metadata:
-  name: orohttp
-  labels:
-    name: orohttp
+  name: orohttp-${WERCKER_GIT_BRANCH}
 spec:
   replicas: 2
   template:
     metadata:
       labels:
-        name: orohttp
+        name: orohttp-${WERCKER_GIT_BRANCH}
         branch: ${WERCKER_GIT_BRANCH}
         commit: ${WERCKER_GIT_COMMIT}
     spec:
       containers:
-      - name: orohttp
-        image: oronu/nginx-simple-html:master:${WERCKER_GIT_COMMIT}
+      - name: orohttp-${WERCKER_GIT_BRANCH}
+        image: oronu/nginx-simple-html:${WERCKER_GIT_COMMIT}
         ports:
         - name: http-server
           containerPort: 8080
           protocol: TCP
 #+END_SRC
+Now unfortunately Kubernetes [[https://github.com/kubernetes/features/issues/35][does not]] support parameterization inside its template files yet. This could be remedied by building the template files via following script inside the wercker.yml
+#+BEGIN_SRC sh
+eval "cat <<EOF
+$(cat "$1")
+EOF"
+#+END_SRC
+
 This definition will result in all commits to all branches being automatically deployed. Different branches however will get different loadbalancers and therefore different DNS addresses. 
+
+[[file:wercker.jpg]]
+
+And just to make sure, let's check the actual deployed application:
+#+BEGIN_SRC sh
+kubectl get svc -o wide
+#+END_SRC
+
+#+RESULTS[e5a29f9394c8dee284fe43a10fe6df841c471f1b]:
+: NAME             CLUSTER-IP      EXTERNAL-IP                                                               PORT(S)   AGE       SELECTOR
+: kubernetes       100.64.0.1      <none>                                                                    443/TCP   55m       <none>
+: orohttp-master   100.71.47.208   af689c86086eb11e6a0a50e4d6ac19b8-1846451599.us-east-1.elb.amazonaws.com   80/TCP    8m        branch=master,commit=c9c84f1b9b479d2133541b2f3065af1d86559c94,name=orohttp-master
+
+#+BEGIN_SRC http
+GET af689c86086eb11e6a0a50e4d6ac19b8-1846451599.us-east-1.elb.amazonaws.com
+#+END_SRC
+
+#+RESULTS[d4c674588c06fc5880f56d16a7eec53a86ced5ed]:
+#+begin_example
+HTTP/1.1 200 OK
+Accept-Ranges: bytes
+Content-Length: 155
+Content-Type: text/html; charset=utf-8
+Last-Modified: Fri, 30 Sep 2016 08:57:28 GMT
+Date: Fri, 30 Sep 2016 09:06:22 GMT
+
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8">
+    <title>Hello there</title>
+  </head>
+  <body>
+ Automation for the People 
+  </body>
+</html>
+#+end_example
+
 ** Cleanup
 
 #+BEGIN_SRC sh :dir out/terraform
