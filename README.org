@@ -1443,6 +1443,11 @@ Voila. However, Kubernetes [[https://github.com/kubernetes/kops/blob/master/docs
 |                                                                                                                                                 |
 | Cluster deleted                                                                                                                                 |
 
+** Links
+- [[https://hub.docker.com/r/oronu/nginx-simple-html/tags/][Dockerhub container image]]
+- [[https://app.wercker.com/Haftcreme/simple-nginx-on-docker/runs][Wercker pipeline]]
+- [[https://github.com/Oro/simple-nginx-on-docker][Demo application + infrastructure files]]
+
 * Footnotes
 
 [fn:1] Note that the output might look weird. I could not get emacs to work well with the escape characters Terraform uses to e.g. make its text bold.
