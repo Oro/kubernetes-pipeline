@@ -1701,6 +1701,26 @@ Voila. However, Kubernetes [[https://github.com/kubernetes/kops/blob/master/docs
 - [[https://app.wercker.com/Haftcreme/simple-nginx-on-docker/runs][Wercker pipeline]]
 - [[https://github.com/Oro/simple-nginx-on-docker][Demo application + infrastructure files]]
 
+** ToDos
+Now granted this is not a comprehensive guide.
+- It is still missing any sort of notification in case something goes wrong
+- There is no automatic cleanup of deployments
+- There is no automatic rollback in case of errors
+- And, above all: This is *extremely* complicated just to host a simple web page. Again, for only static files, you are much better of using something like [[https://pages.github.com/][GitHub pages]] or even [[http://docs.aws.amazon.com/AmazonS3/latest/dev/WebsiteHosting.html][S3]].
+** Closing remarks
+   Would I reccomend using Kubernetes? ABSOLUTELY.
+Not only is Kubernetes extremely sophisticated, it is also advancing at an incredible speed. For reference, I've tried it out around a year ago with V0.18, and it did not yet have Deployments, Pets, Batch Jobs or ConfigMaps, all of which are incredibly helpful.
+Having said that, I am not sure if I'd necessarily reccomend Wercker. Granted, it works nicely - when it works. I've ran into several panics when trying to run the wercker cli locally, NO output whatsoever on the web GUI if the working directory does not exist, and the documentation is severely outdated. It is still in beta, yes, however if this is an indication of things to come that I am not sure if I would like to bet on it for something as critical as a CI server.
+** TL;DR
+To bootstrap a kubernetes cluster:
+#+BEGIN_SRC sh
+kops create cluster --zones=us-east-1a dev.k8s.orovecchia.com --state=s3://oro-kops-state --yes
+#+END_SRC
+To push a new version of our code or infrastructure:
+#+BEGIN_SRC sh
+wercker deploy --pipeline kube-deploy
+#+END_SRC
+
 * Footnotes
 
 [fn:1] Note that the output might look weird. I could not get emacs to work well with the escape characters Terraform uses to e.g. make its text bold.
