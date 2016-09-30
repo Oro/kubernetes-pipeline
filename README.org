@@ -1263,6 +1263,259 @@ Date: Fri, 30 Sep 2016 09:06:22 GMT
 </html>
 #+end_example
 
+** Testing and health checks
+Up until now, we are only hoping that our infrastructure and applications are working. Let's make sure of that.
+However, instead of focusing on (classic) infrastructure tests, let's first make sure that what actually matters is working: The application itself. For this, we can already test our pipeline.
+Let's start working on our new feature:
+#+BEGIN_SRC sh :dir webpage
+git flow feature start init-healthcheck
+#+END_SRC
+
+#+RESULTS[a89cb8b166f90f319071a8625e4b1712d67f67df]:
+: 
+: Summary of actions:
+: - A new branch 'feature-init-healthcheck' was created, based on 'develop'
+: - You are now on branch 'feature-init-healthcheck'
+: 
+: Now, start committing on your feature. When done, use:
+: 
+:      git flow feature finish init-healthcheck
+: 
+
+Now we are changing our application so that it responds to a =/healthz= endpoint: (this is taken with slight adaptations from https://github.com/kubernetes/kubernetes.github.io/blob/master/docs/user-guide/liveness/image/server.go)
+#+BEGIN_SRC go :tangle webpage/app.go
+/*
+Copyright 2014 The Kubernetes Authors All rights reserved.
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+    http://www.apache.org/licenses/LICENSE-2.0
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+// A simple server that is alive for 10 seconds, then reports unhealthy for
+// the rest of its (hopefully) short existence.
+package main
+
+import (
+	"fmt"
+	"log"
+	"net/http"
+	"time"
+)
+
+func main() {
+	started := time.Now()
+	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, "static/index.html")
+	})
+	http.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
+		duration := time.Now().Sub(started)
+		if duration.Seconds() > 10 {
+			w.WriteHeader(500)
+			w.Write([]byte(fmt.Sprintf("error: %v", duration.Seconds())))
+		} else {
+			w.WriteHeader(200)
+			w.Write([]byte("ok"))
+		}
+
+	})
+	log.Println(http.ListenAndServe(":8080", nil))
+}
+#+END_SRC
+
+This application now serves (as before) our index.html from =/= and additionally exposes a =healthz= endpoint that responds with =200 OK= for 10 seconds and =500 error= after that. Basically, we've introduced a bug in our endpoint which does not even surface to a user. Remember that time when your backend silently swallowed every 100th request? Good times...
+
+Now we also need to consume the =healthz= endpoint, which is done in our deployment spec.
+#+BEGIN_SRC yaml :tangle webpage/kube.yml
+
+---
+kind: Service
+apiVersion: v1
+metadata:
+  name: orohttp-${WERCKER_GIT_BRANCH}
+spec:
+  ports:
+    - port: 80
+      targetPort: http-server
+      protocol: TCP
+  type: LoadBalancer
+  selector:
+    name: orohttp-${WERCKER_GIT_BRANCH}
+    branch: ${WERCKER_GIT_BRANCH}
+    commit: ${WERCKER_GIT_COMMIT}
+---
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: orohttp-${WERCKER_GIT_BRANCH}
+spec:
+  replicas: 2
+  template:
+    metadata:
+      labels:
+        name: orohttp-${WERCKER_GIT_BRANCH}
+        branch: ${WERCKER_GIT_BRANCH}
+        commit: ${WERCKER_GIT_COMMIT}
+    spec:
+      containers:
+      - name: orohttp-${WERCKER_GIT_BRANCH}
+        image: oronu/nginx-simple-html:${WERCKER_GIT_COMMIT}
+        ports:
+        - name: http-server
+          containerPort: 8080
+          protocol: TCP
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: http-server
+          initialDelaySeconds: 15
+          timeoutSeconds: 1
+#+END_SRC
+
+With those changes, we can push our new branch into github and check the (new!) endpoint that Kubernetes created.
+#+BEGIN_SRC sh
+kubectl get svc -o wide
+#+END_SRC
+
+#+RESULTS[e5a29f9394c8dee284fe43a10fe6df841c471f1b]:
+: NAME                               CLUSTER-IP       EXTERNAL-IP                                                               PORT(S)   AGE       SELECTOR
+: kubernetes                         100.64.0.1       <none>                                                                    443/TCP   2h        <none>
+: orohttp-feature-init-healthcheck   100.65.243.228   ab4871ba286f611e6a0a50e4d6ac19b8-294871847.us-east-1.elb.amazonaws.com    80/TCP    42s       branch=feature-init-healthcheck,commit=6b223dfc4c846e3cff52025356c2cd70c545cb27,name=orohttp-feature-init-healthcheck
+: orohttp-master                     100.71.47.208    af689c86086eb11e6a0a50e4d6ac19b8-1846451599.us-east-1.elb.amazonaws.com   80/TCP    1h        branch=master,commit=c9c84f1b9b479d2133541b2f3065af1d86559c94,name=orohttp-master
+
+#+BEGIN_SRC http
+GET ab4871ba286f611e6a0a50e4d6ac19b8-294871847.us-east-1.elb.amazonaws.com
+#+END_SRC
+
+#+RESULTS[ae89c8efab28064cb92a6176ab3f1bde3a06d57f]:
+#+begin_example
+HTTP/1.1 200 OK
+Accept-Ranges: bytes
+Content-Length: 155
+Content-Type: text/html; charset=utf-8
+Last-Modified: Fri, 30 Sep 2016 10:14:18 GMT
+Date: Fri, 30 Sep 2016 10:17:43 GMT
+
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8">
+    <title>Hello there</title>
+  </head>
+  <body>
+ Automation for the People 
+  </body>
+</html>
+#+end_example
+
+For a user everything looks fine, however when we check the actual pod definitions we can see that they die after a short time
+#+BEGIN_SRC sh
+kubectl get pods
+#+END_SRC
+
+#+RESULTS[b38b4854c429130a645b996aa3088bbd05434cfc]:
+: NAME                                                READY     STATUS             RESTARTS   AGE
+: orohttp-feature-init-healthcheck-1833998652-5k6vo   0/1       CrashLoopBackOff   5          3m
+: orohttp-feature-init-healthcheck-1833998652-n0ggi   0/1       CrashLoopBackOff   5          3m
+: orohttp-master-3020287202-dhii1                     1/1       Running            0          1h
+: orohttp-master-3020287202-icqgp                     1/1       Running            0          1h
+
+Let's fix that:
+#+BEGIN_SRC go :tangle webpage/app.go
+
+/*
+Copyright 2014 The Kubernetes Authors All rights reserved.
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+    http://www.apache.org/licenses/LICENSE-2.0
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+// A simple server that is alive for 10 seconds, then reports unhealthy for
+// the rest of its (hopefully) short existence.
+package main
+
+import (
+	"log"
+	"net/http"
+)
+
+func main() {
+	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, "static/index.html")
+	})
+	http.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(200)
+		w.Write([]byte("ok"))
+	})
+	log.Println(http.ListenAndServe(":8080", nil))
+}
+#+END_SRC
+
+#+BEGIN_EXAMPLE
+The Deployment "orohttp-feature-init-healthcheck" is invalid.
+spec.template.metadata.labels: Invalid value: {"branch":"feature-init-healthcheck","commit":"latest","name":"orohttp-feature-init-healthcheck"}: `selector` does not match template `labels`
+#+END_EXAMPLE
+
+Uh-oh, this is not related to our build file but to our infrastructure. This seems to be caused by [[https://github.com/kubernetes/kubernetes/issues/26202]] and seems to suggest that changing selectors (what we are using for the load balancer to know which containers to switch in) is not a good idea but instead creating new load balancers. For our use case, let's simply remove the commit label since it is not needed anyways (the commit is already referenced as the image itself)
+
+After that is fixed, let's recheck our deployment
+#+BEGIN_SRC sh
+kubectl get pods
+#+END_SRC
+
+#+RESULTS[b38b4854c429130a645b996aa3088bbd05434cfc]:
+: NAME                                               READY     STATUS    RESTARTS   AGE
+: orohttp-feature-init-healthcheck-568167226-mm7uf   1/1       Running   0          1m
+: orohttp-feature-init-healthcheck-568167226-xvokv   1/1       Running   0          1m
+: orohttp-master-3020287202-dhii1                    1/1       Running   0          1h
+: orohttp-master-3020287202-icqgp                    1/1       Running   0          1h
+
+Much better. Let's finish our work with a merge to master and recheck our deployment one last time.
+#+BEGIN_SRC sh :dir webpage
+git flow feature finish init-healthcheck
+git push
+#+END_SRC
+
+#+RESULTS[5ae777c0f443a9b456324034b99ccd79f2598424]:
+#+begin_example
+Merge made by the 'recursive' strategy.
+ app.go   | 31 +++++++++++++++++++++++++------
+ kube.yml |  8 ++++++--
+ 2 files changed, 31 insertions(+), 8 deletions(-)
+Deleted branch feature-init-healthcheck (was 1e24202).
+
+Summary of actions:
+- The feature branch 'feature-init-healthcheck' was merged into 'develop'
+- Feature branch 'feature-init-healthcheck' has been removed
+- You are now on branch 'develop'
+
+#+end_example
+
+#+BEGIN_SRC sh
+kubectl get deployments,pods
+#+END_SRC
+
+#+RESULTS[fa863528166911b1a36233d74616ef647d6e0410]:
+: NAME                                               DESIRED   CURRENT   UP-TO-DATE   AVAILABLE   AGE
+: orohttp-develop                                    2         2         2            2           47s
+: orohttp-feature-init-healthcheck                   2         2         2            2           7m
+: NAME                                               READY     STATUS    RESTARTS     AGE
+: orohttp-develop-3627383002-joyey                   1/1       Running   0            47s
+: orohttp-develop-3627383002-nk3me                   1/1       Running   0            47s
+: orohttp-feature-init-healthcheck-568167226-mm7uf   1/1       Running   0            7m
+: orohttp-feature-init-healthcheck-568167226-xvokv   1/1       Running   0            7m
+
 ** Cleanup
 
 #+BEGIN_SRC sh :dir out/terraform
