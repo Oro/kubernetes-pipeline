@@ -18,7 +18,7 @@ brew update
 brew install terraform
 #+END_SRC
 
-#+RESULTS[fe6c2689e91e6d061c66b63dbc04577128b5eefd]:
+
 : Already up-to-date.
 
 To make sure my AWS credentials (saved in $HOME/.aws/credentials) were picked up by Terraform, I've created an initial, bare-bones Terraform config (which is pretty much taken verbatim from the [[https://www.terraform.io/intro/getting-started/build.html][Terraform Getting Started Guide]])
@@ -30,12 +30,12 @@ resource "aws_instance" "example" {
   instance_type = "t2.micro"
 }
 #+END_SRC
-planned[fn:1] 
+planned
 #+BEGIN_SRC sh
 terraform plan 1-initial
 #+END_SRC
 
-#+RESULTS[e587d1b52e207580b608bcbe150acd2c44730415]:
+
 #+begin_example
 provider.aws.region
   The region where AWS operations will take place. Examples
@@ -87,7 +87,7 @@ and applied it
 terraform apply 1-initial
 #+END_SRC
 
-#+RESULTS[7712e5563c62e780e4b29a71e78c646fd51dd78d]:
+
 #+begin_example
 provider.aws.region
   The region where AWS operations will take place. Examples
@@ -134,7 +134,7 @@ That looks promising, and with a quick glance at the AWS console I could confirm
 terraform destroy -force 1-initial
 #+END_SRC
 
-#+RESULTS[7bd50d0841515b3685d28efe1f88969c17d6ac92]:
+
 #+begin_example
 provider.aws.region
   The region where AWS operations will take place. Examples
@@ -174,7 +174,7 @@ After the compilation was done, I've instructed Kops to output Terraform files f
 ~/golang/bin/kops update cluster --target=terraform dev.k8s.orovecchia.com --state=s3://oro-kops-state
 #+END_SRC
 
-#+RESULTS[a2375c6c1169489fd0fbc275d3351ae5ff50fd4d]:
+
 : Wrote config for dev.k8s.orovecchia.com to "/Users/Marco/.kube/config"
 
 This will create the terraform files in =out/terraform=, setup the Kubernetes config in =~/.kube/config= and store the [[https://github.com/kubernetes/kops/blob/master/docs/state.md][state]] of Kops inside an S3 bucket. This has the benefit that 
@@ -186,7 +186,7 @@ Let's spawn the cluster
 terraform plan
 #+END_SRC
 
-#+RESULTS[95274117a75246d4cc3b51646e38271328ecc460]:
+
 #+begin_example
 Refreshing Terraform state in-memory prior to plan...
 The refreshed state will be used to calculate this plan, but
@@ -564,7 +564,7 @@ Plan: 32 to add, 0 to change, 0 to destroy.
 terraform apply
 #+END_SRC
 
-#+RESULTS[acb99038c2f150de063a574dc7a81de135882ffa]:
+
 #+begin_example
 aws_key_pair.kubernetes-dev-k8s-orovecchia-com-952344bf29bc219a86d3bc12f1767073: Creating...
   fingerprint: "" => "<computed>"
@@ -959,9 +959,9 @@ brew install kubectl
 kubectl cluster-info
 #+END_SRC
 
-#+RESULTS[77fbaf3bc9f2d50d48c2bfd58f9f91191680b044]:
-: [0;32mKubernetes master is running at [0;33mhttps://api.dev.k8s.orovecchia.com
-: [0;32mKubeDNS is running at [0;33mhttps://api.dev.k8s.orovecchia.com/api/v1/proxy/namespaces/kube-system/services/kube-dns
+
+: Kubernetes master is running at https://api.dev.k8s.orovecchia.com
+: KubeDNS is running at https://api.dev.k8s.orovecchia.com/api/v1/proxy/namespaces/kube-system/services/kube-dns
 
 Now onto creating the application:
 
@@ -1043,7 +1043,7 @@ This wercker file + command will automatically reload our local dev environment 
 GET http://localhost:8080
 #+END_SRC
 
-#+RESULTS[f55c07ca7ef544e097580a71c3dfed973f827b7d]:
+
 #+begin_example
 HTTP/1.1 200 OK
 Accept-Ranges: bytes
@@ -1074,7 +1074,7 @@ Let's have a look via the REST API (the most important part, the =result= that p
 GET https://app.wercker.com/api/v3/runs/57ed6b9318c4c70100453a9e
 #+END_SRC
 
-#+RESULTS[76ca77ee235bd0e7924b63e563a670489f9061a9]:
+
 #+BEGIN_SRC js
 {
   "pipeline": {
@@ -1233,7 +1233,7 @@ And just to make sure, let's check the actual deployed application:
 kubectl get svc -o wide
 #+END_SRC
 
-#+RESULTS[e5a29f9394c8dee284fe43a10fe6df841c471f1b]:
+
 : NAME             CLUSTER-IP      EXTERNAL-IP                                                               PORT(S)   AGE       SELECTOR
 : kubernetes       100.64.0.1      <none>                                                                    443/TCP   55m       <none>
 : orohttp-master   100.71.47.208   af689c86086eb11e6a0a50e4d6ac19b8-1846451599.us-east-1.elb.amazonaws.com   80/TCP    8m        branch=master,commit=c9c84f1b9b479d2133541b2f3065af1d86559c94,name=orohttp-master
@@ -1242,7 +1242,7 @@ kubectl get svc -o wide
 GET af689c86086eb11e6a0a50e4d6ac19b8-1846451599.us-east-1.elb.amazonaws.com
 #+END_SRC
 
-#+RESULTS[d4c674588c06fc5880f56d16a7eec53a86ced5ed]:
+
 #+begin_example
 HTTP/1.1 200 OK
 Accept-Ranges: bytes
@@ -1271,7 +1271,7 @@ Let's start working on our new feature:
 git flow feature start init-healthcheck
 #+END_SRC
 
-#+RESULTS[a89cb8b166f90f319071a8625e4b1712d67f67df]:
+
 : 
 : Summary of actions:
 : - A new branch 'feature-init-healthcheck' was created, based on 'develop'
@@ -1382,7 +1382,7 @@ With those changes, we can push our new branch into github and check the (new!) 
 kubectl get svc -o wide
 #+END_SRC
 
-#+RESULTS[e5a29f9394c8dee284fe43a10fe6df841c471f1b]:
+
 : NAME                               CLUSTER-IP       EXTERNAL-IP                                                               PORT(S)   AGE       SELECTOR
 : kubernetes                         100.64.0.1       <none>                                                                    443/TCP   2h        <none>
 : orohttp-feature-init-healthcheck   100.65.243.228   ab4871ba286f611e6a0a50e4d6ac19b8-294871847.us-east-1.elb.amazonaws.com    80/TCP    42s       branch=feature-init-healthcheck,commit=6b223dfc4c846e3cff52025356c2cd70c545cb27,name=orohttp-feature-init-healthcheck
@@ -1392,7 +1392,7 @@ kubectl get svc -o wide
 GET ab4871ba286f611e6a0a50e4d6ac19b8-294871847.us-east-1.elb.amazonaws.com
 #+END_SRC
 
-#+RESULTS[ae89c8efab28064cb92a6176ab3f1bde3a06d57f]:
+
 #+begin_example
 HTTP/1.1 200 OK
 Accept-Ranges: bytes
@@ -1418,7 +1418,7 @@ For a user everything looks fine, however when we check the actual pod definitio
 kubectl get pods
 #+END_SRC
 
-#+RESULTS[b38b4854c429130a645b996aa3088bbd05434cfc]:
+
 : NAME                                                READY     STATUS             RESTARTS   AGE
 : orohttp-feature-init-healthcheck-1833998652-5k6vo   0/1       CrashLoopBackOff   5          3m
 : orohttp-feature-init-healthcheck-1833998652-n0ggi   0/1       CrashLoopBackOff   5          3m
@@ -1474,7 +1474,7 @@ After that is fixed, let's recheck our deployment
 kubectl get pods
 #+END_SRC
 
-#+RESULTS[b38b4854c429130a645b996aa3088bbd05434cfc]:
+
 : NAME                                               READY     STATUS    RESTARTS   AGE
 : orohttp-feature-init-healthcheck-568167226-mm7uf   1/1       Running   0          1m
 : orohttp-feature-init-healthcheck-568167226-xvokv   1/1       Running   0          1m
@@ -1487,7 +1487,7 @@ git flow feature finish init-healthcheck
 git push
 #+END_SRC
 
-#+RESULTS[5ae777c0f443a9b456324034b99ccd79f2598424]:
+
 #+begin_example
 Merge made by the 'recursive' strategy.
  app.go   | 31 +++++++++++++++++++++++++------
@@ -1506,7 +1506,7 @@ Summary of actions:
 kubectl get deployments,pods
 #+END_SRC
 
-#+RESULTS[fa863528166911b1a36233d74616ef647d6e0410]:
+
 : NAME                                               DESIRED   CURRENT   UP-TO-DATE   AVAILABLE   AGE
 : orohttp-develop                                    2         2         2            2           47s
 : orohttp-feature-init-healthcheck                   2         2         2            2           7m
@@ -1522,7 +1522,7 @@ kubectl get deployments,pods
 terraform plan -destroy 
 #+END_SRC
 
-#+RESULTS[e65fc8ec99857055389805a6e6fe5c6a9ed9cc13]:
+
 #+begin_example
 Refreshing Terraform state in-memory prior to plan...
 The refreshed state will be used to calculate this plan, but
@@ -1642,7 +1642,7 @@ Plan: 0 to add, 0 to change, 32 to destroy.
 terraform destroy -force
 #+END_SRC
 
-#+RESULTS[1a1893ac337603c3ae785a464b0f46548ee80b89]:
+
 #+BEGIN_EXAMPLE
 Error applying plan:
 
@@ -1722,7 +1722,3 @@ To push a new version of our code or infrastructure:
 #+BEGIN_SRC sh
 wercker deploy --pipeline kube-deploy
 #+END_SRC
-
-* Footnotes
-
-[fn:1] Note that the output might look weird. I could not get emacs to work well with the escape characters Terraform uses to e.g. make its text bold.
